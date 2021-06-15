@@ -37,26 +37,34 @@ https://bookdown.org/mikemahoney218/IDEAR/data-wrangling.html
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Step 1: Read in raw data, basic cleaning, restructuring, and verifying missing data
 ```{r cleaning,eval=T,echo=F, cache=T, results=F, warning=F, message=F}
 library(tidyverse)
-# | Phase 1 competing risk 
-sh1_patient <- read_csv("Sh1_Patient.csv")
-sh3_AR <- read_csv("Sh2_PtAnnualAR.csv")
-sh4_notif <- read_csv("Sh4_PtNotif.csv")
-sh5_comorb <- read_csv("Sh5_PtNotifComorb.csv")
-sh6_lab <- read_csv("Sh6_PtNotifLab.csv")
-sh7_outcome <- read_csv("Sh7_PtNotifOutcome.csv")
-sh8_peri <- read_csv("Sh8_PtNotifPDPeri.csv")
+############################################
+### Read in raw data provided by the NRR ###
+############################################
 
-sh9_periAB <- read_csv("Sh9_PtNotifPDPeriAB.csv")
+sh1_patient     <- read_csv("Sh1_Patient.csv")
+sh3_AR          <- read_csv("Sh2_PtAnnualAR.csv")
+sh4_notif       <- read_csv("Sh4_PtNotif.csv")
+sh5_comorb      <- read_csv("Sh5_PtNotifComorb.csv")
+sh6_lab         <- read_csv("Sh6_PtNotifLab.csv")
+sh7_outcome     <- read_csv("Sh7_PtNotifOutcome.csv")
+sh8_peri        <- read_csv("Sh8_PtNotifPDPeri.csv")
+sh9_periAB      <- read_csv("Sh9_PtNotifPDPeriAB.csv")
 sh10_pdperiperf <- read_csv("Sh10_PtNotifPDPeriPerf.csv")
-sh11_pdsys <- read_csv("Sh11_PtNotifPDSystem.csv")
-sh12_sero <- read_csv("Sh12_PtNotifSerology.csv")
-sh13_sdp <- read_csv("Sh13_SDP.csv")
+sh11_pdsys      <- read_csv("Sh11_PtNotifPDSystem.csv")
+sh12_sero       <- read_csv("Sh12_PtNotifSerology.csv")
+sh13_sdp        <- read_csv("Sh13_SDP.csv")
 
 ```
 
 ```{r sh1,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
+
+#########################################
+### Data sheet 1: Patient Information ###
+#########################################
+
 #Step 1: clarify the data structure 
 str(sh1_patient) #Date format ok, others should be factor 
 
@@ -71,7 +79,7 @@ which(is.na(sh1_patient)) #no missing data
 
 #Step 4: Explore & enrich the data 
 
-### 4.1: histogram for Race, and Blood-group 
+### 4.1: Basic demographics 
 library(DataExplorer)
 plot_bar(sh1_patient$PtSex)         #Male=1, Female=2
 plot_bar(sh1_patient$PtCitizenship) #Malaysian=1
@@ -79,7 +87,8 @@ plot_bar(sh1_patient$PtRace)        #Malay=1, Chi=2, Ind=3, BumiSabah=4
                                     #BumiSarawak=5, OrgAsliSemj=7, OtherMsian=19, 
                                     #Foreigner=20
 plot_bar(sh1_patient$PtABO)         #A=1, B=2, AB=3, O=4, NA=8888, missing=9999
-#note: some patients blood-group (PtABO) is "not available"; variable will not be used.
+                                    #note: some patients blood-group (PtABO) is "not available"; 
+                                      #variable will not be used.
 
 ### 4.2: convert dob to age ###
 sh1_patient['Age']<-NA #create a new variable called "Age"
@@ -106,6 +115,10 @@ ggplot(sh1_patient, aes(x=Age)) +
 
 ```{r sh3,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
 
+###########################################
+### Data sheet 3: Patient Annual Return ###
+###########################################
+
 #Step 1: clarify the data structure 
 str(sh3_AR) #PtARID, PatientID, NotifID, SDPID, PtAssist should be factor 
 x<-c("PtARID", "PatientID", "NotifID","PtRRTID", "SDPID")
@@ -124,7 +137,7 @@ sh3_AR<-arrange(sh3_AR,PatientID, DataYear) #some patients did not return the fo
 
 ## 4.2: identify which PtAssist changed / deteriorates 
 #plot_bar(sh3_AR$PtAssist)
-which(sh3_AR$PtAssist==8888) #26 rows has NA for PtAssist 
+which(sh3_AR$PtAssist==8888) #26 rows has NA for PtAssist for some years 
 sh3_AR$PtAssist[which(sh3_AR$PtAssist==8888)]<-NA
 which(is.na(sh3_AR$PtAssist)) #all 26 rows converted to NA
 
@@ -143,7 +156,7 @@ sh3_AR<-sh3_AR %>%
 sh3_AR$deteriorate[which(is.na(sh3_AR$deteriorate))]<-0
 
 
-## Create a new sub-data that contains latest DataYear
+## Create a new sub-data that contains latest DataYear (variable currently not used in analysis)
 ## Will sacrifice some details in PtAssist over time 
 sh3_AR<-arrange(sh3_AR, PatientID, desc(DataYear))
 
@@ -155,6 +168,10 @@ sh3_AR2<-subset(sh3_AR2, select =  -c(8:9))
 ``` 
 
 ```{r sh4,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
+
+##########################################
+### Data sheet 4: Patient Notification ###
+##########################################
 
 #Step 1: clarify the data structure 
 str(sh4_notif)    #A few issues: 
@@ -249,6 +266,11 @@ sh4_notif<-sh4_notif[rowid(rleid(PatientID)) == 1] #final dataset has 1149 obs
 
 ```{r sh5,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
 
+###########################################
+### Data sheet 5: Patient Comorbidities ###
+###########################################
+
+
 #Step 1: clarify the data structure 
 str(sh5_comorb) #Issues identified 
                 #PtNotifComorbidityID, PatientID, NotifID, PtRRTID, SDPID, Comorbidity - factor 
@@ -268,7 +290,6 @@ which(duplicated(sh5_comorb$PatientID)) #PatientID repeated for multiple comorbi
 which(is.na(sh5_comorb[,1:8])) #no missing data
 
 #Step 4: Explore & enrich the data 
-
 ## 4.1: convert the column "Comorbidity" from long to wide
 ## | use the newer pivot_wider() from tidyverse/tidyr to make the conversion 
 ## | add a new column to indicate comorb is "present" 
@@ -371,6 +392,10 @@ sh5_comorb$PatientID<-as.numeric(sh5_comorb$PatientID)
 
 ```{r sh7,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
 
+#################################################################
+### Data sheet 7: Patient Outcome (except peritonitis or ESI) ###
+#################################################################
+
 #Step 1: clarify the data structure 
 str(sh7_outcome)  #Similar issues as previous sheets 
                   #PtNotifOutcomeID, PatientID, NotifID, PtRRTID, SDPID - factor 
@@ -417,6 +442,10 @@ sh7_outcome<-subset(sh7_outcome, select = c(1:9))
 ``` 
 
 ```{r sh8,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
+
+##############################################################
+### Data sheet 8: Patient outcome (only peritontis or ESI) ###
+##############################################################
 
 #Step 1: clarify the data structure 
 str(sh8_peri)     #A few issues
@@ -541,19 +570,23 @@ which(sh8_peri$PatientID==76394 & sh8_peri$PtNotifPDPeriID==15337)
 
 #index 394,531,532,533,534,535,536,537,538,673,992,993,1016
 sh8_peri <- sh8_peri[-c(394,531,532,533,534,535,536,537,538,673,992,993,1016),]
-  
+
+# Current analysis only look at peritonitis, so will remove all cases of ESI
 sh8_peri <- subset(sh8_peri, sh8_peri$PeritonitisType==2 )
 
 ``` 
 
 ```{r sh7_8, eval=T, echo=F, cache=T, results=FALSE, warning=FALSE, message=FALSE} 
 
+###############################################################################
+### Data sheet 7 and 8: combined both sets into a single outcome data frame ###
+###############################################################################
+
 # combine both sh7 and sh8 into one outcome dataset 
 
 ## Step 1: change the PeritonitisType to PtOutcomeID, and DatePeri to PtDateOutcome 
 ##  | Peritonitis from 2-> 12; ESI from 1-> 13 
 sh8_peri$PeritonitisType[sh8_peri$PeritonitisType==2]<- 12
-sh8_peri$PeritonitisType[sh8_peri$PeritonitisType==1]<- 13
 
 ##  | Rename column 
 sh8_peri<- rename(sh8_peri, PtOutcomeID=PeritonitisType)
@@ -583,6 +616,10 @@ sh7_8 <- subset(sh7_8,select =  c(2:8))
 
 ```{r sh_demo, eval=T, echo=F, cache=T, results=FALSE, warning=FALSE, message=FALSE}
 
+#############################################
+### Combine all dataset into a single set ###
+#############################################
+
 # combine sh1, sh3, sh4, and sh5 to form a combined demographic dataset 
 
 library(data.table)
@@ -597,8 +634,9 @@ sh_demo.fin<-arrange(sh_demo.fin, PatientID) #1149 obs
 
 ```{r sh_11, eval=T, echo=F, cache=T, results=FALSE, warning=FALSE, message=FALSE}
 
-sh11_pdsys <- read_csv("Sh11_PtNotifPDSystem.csv")
-
+########################################
+### Data sheet 11: Patient PD system ###
+########################################
 
 #Step 1: clarify the data structure 
 str(sh11_pdsys) #PDRegimen and PDSystem were both numeric variables 
@@ -621,13 +659,14 @@ sh11_pdsys <- sh11_pdsys %>%
 
 which(is.na(sh11_pdsys$PDRegimen)&sh11_pdsys$Index==1) #1 (ID:1253), 79 (ID: 25299), 1601 (ID:70770), 1754 (ID: 71009)
 
-#change PDRegimen into a factor variable 
-sh11_pdsys$PDRegimen<- as.factor(sh11_pdsys$PDRegimen)
-
+#verify source
 sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==1253&sh11_pdsys$Index==1)]<-3
 sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==70770&sh11_pdsys$Index==1)]<-1
 sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==71009&sh11_pdsys$Index==1)]<-1
 sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==25299&sh11_pdsys$Index==1)]<-1
+
+#change PDRegimen into a factor variable 
+sh11_pdsys$PDRegimen<- as.factor(sh11_pdsys$PDRegimen)
 
 #set PDSystem ==8888 or 9999 to NA 
 sh11_pdsys$PDSystem[which(sh11_pdsys$PDSystem==8888 | sh11_pdsys$PDSystem==9999)]<-NA
@@ -636,12 +675,13 @@ sh11_pdsys<- relocate(sh11_pdsys, PDSystem, .after = Index)
 
 which(is.na(sh11_pdsys$PDSystem)&sh11_pdsys$Index==1) #1 (ID:1253), 79 (ID: 25299), 1601 (ID:70770), 1754 (ID: 71009)
 
+#verify source 
 sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==1253&sh11_pdsys$Index==1)]<-101
 sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==70770&sh11_pdsys$Index==1)]<-101
 sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==71009&sh11_pdsys$Index==1)]<-101
 sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==25299&sh11_pdsys$Index==1)]<-101
 
-## Keep only the first row 
+## Keep only the first row (the baseline PD system)
 sh11_pdsys <- sh11_pdsys %>%
   arrange(PatientID, Index) %>%
   filter(Index==1)
@@ -662,9 +702,15 @@ sh11_pdsys$brand[which(sh11_pdsys$PDSystem==301|sh11_pdsys$PDSystem==388|sh11_pd
 sh11_pdsys$brand[which(is.na(sh11_pdsys$brand))]<-9
 ```
 
-##### Fork to competing risk branch for peritonitis as outcome 
+--- End of Basic Data Cleaning --- 
+
+# Step 2: Data Wrangling 
 ```{r wrangle_cmprsk_peri, eval=T, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE}
-# need to redo the steps in all_data EXCEPT dropping patients with PtOutcomeID==0
+
+#######################################################
+### To create a dataset for competing risk analysis ###
+#######################################################
+
 sh_final<-merge(sh7_8, sh_demo.fin, by="PatientID", all = TRUE)
 
 sh_final<-arrange(sh_final, PatientID, PtDateOutcome)
@@ -722,23 +768,23 @@ sh_final <- sh_final %>%
   relocate(death, .after=Age)
 
 # check the category of Patient Outcome 
-#plot_bar(sh_final$PtOutcomeID)  #shows 7 categories
-                                #12: peritonitis, 1: death, 13: ESI, 
+plot_bar(sh_final$PtOutcomeID)  #shows 7 categories
+                                #12: peritonitis, 1: death
                                 #2: HD, 8: recover kidney function,                                 
                                 #6: lost to f/up, 3: transplanted 
 
-comp <- sh_final #prepare a new datasets for wrangling for cox
+comp <- sh_final #prepare a new datasets for subsequent data wrangling 
 
 #create a new variable "status" 
 comp['status']<- NA
 comp <- comp %>% 
   relocate(status, .after= PtOutcomeID)
 
-comp$status[which(comp$PtOutcomeID==0)]  <-0
-comp$status[which(comp$PtOutcomeID==12)] <-1
-comp$status[which(comp$PtOutcomeID==2)]  <-2 #death & HD are denoted competing risks
-comp$status[which(is.na(comp$status2))]<-0 
-comp$status<-as.factor(comp$status2)
+comp$status[which(comp$PtOutcomeID==0)]   <-0 #no event
+comp$status[which(comp$PtOutcomeID==12)]  <-1 #peritonitis
+comp$status[which(comp$PtOutcomeID==2)]   <-2 #transfer to HD are denoted competing risks
+comp$status[which(is.na(comp$status))]    <-0 #all other outcomes are censored 
+comp$status<-as.factor(comp$status)
 
 
 comp <- comp %>% 
@@ -757,20 +803,19 @@ comp <- comp %>%
   arrange(PatientID, PtDateOutcome)  %>%
   filter(Index==1)
 
-##  | drop PtHeight and PtWeight (for now since too many missing data)
-comp <- subset(comp, select = -c(t.start2, NotifID, PtRRTID, SDPID, SDPID.x, PtARID, NotifID.x, PtRRTID.x, givendate.x,NotifID.y, PtRRTID.y, PtRenalSpecify, PtRenal2, PtRenalSpecify2, givendate.y, PtHeight, PtWeight, Modality))
+# create a new variable "dm" to denote primary renal disease of diabetes 
+comp <- comp %>%
+  mutate(dm =ifelse(PtRenal1==2, 1,0)) %>%
+  mutate(gl =ifelse(PtRenal1==3, 1,0)) %>%
+  mutate(uro=ifelse(PtRenal1==4, 1,0)) %>%
+  mutate(neph=ifelse(PtRenal1==11, 1,0)) %>%
+  mutate(hpt=ifelse(PtRenal1==12, 1,0)) %>%
+  mutate(AD=ifelse(PtRenal1==15, 1,0)) %>%
+  mutate(her.neph=ifelse(PtRenal1==16, 1,0)) 
 
 
-######
-######
-### fill in PtAssist arbitrily then verify later 
-######
-######
-comp$PtAssist[which(is.na(comp$PtAssist))]<-1
-comp$PtAssist[which(comp$PtAssist==9999)]<-1
 
 
-comp[is.na(comp)]<-0 #this step will cause many missing data in PtAssist to become "0"
 
 #convert day_diag and day_pd to months 
 comp['month_diag']<-comp$day_diag/30
@@ -797,12 +842,6 @@ comp$site <- as.factor(comp$site)
 ## combine the dataset with sh11_pdsys 
 comp <- merge(comp, sh11_pdsys, by="PatientID", all=TRUE)
 
-
-# create a new variable "dm" to denote primary renal disease of diabetes 
-comp <- comp %>%
-  mutate(dm=ifelse(PtRenal1==2, 1,0)) %>%
-  relocate(dm, .after=PtAssist)
-
 # create a new variable "Age2" to make it similar to Cox PH model 
 library(AMR) 
 comp <- comp %>%
@@ -812,37 +851,46 @@ comp$Age2 <- age_groups(comp$Age, split_at=c(18,30,40,50,60,70,80,90))
 
 comp$Age2<-factor(comp$Age2, ordered = FALSE)
   
-
-
 # create a new variable "m.time" to denote time in month 
 comp['m.time']<- comp$time/30
 
 comp = comp %>%
   relocate(m.time, .after=time)
 
+##  | drop PtHeight and PtWeight (for now since too many missing data) and other variables 
+comp <- subset(comp, select = -c(PtDateCommence, ESRFDateFirstRx,PtDateOutcome,Index,day_diag,day_pd, event,PtDateCentre, DataYear,PtDateBirth, PtCitizenship, PtABO,t.start2, NotifID, PtRRTID, SDPID, SDPID.x, PtARID, NotifID.x, PtRRTID.x, givendate.x,NotifID.y, PtRRTID.y, PtRenalSpecify, PtRenal2, PtRenalSpecify2, givendate.y, PtHeight, PtWeight, Modality))
+
+
+######
+######
+### verify source for PtAssist
+######
+######
+comp$PtAssist[which(is.na(comp$PtAssist))]<-1
+comp$PtAssist[which(comp$PtAssist==9999)]<-1
+
+
+comp[is.na(comp)]<-0 
+
+### re-arrange the columns by column names 
+col_order <- c("PatientID", "t.start", "t.stop", "time", "m.time", "PtOutcomeID", "status","death", "PtSex", "PtRace", "Age", "Age2", "PtAssist", "PtRenal1","dm","gl","uro","neph","hpt","AD","her.neph", "brand", "site", "PDSystem", "PDRegimen", "month_diag", "month_pd", "SDPID.y","comob.hpt", "comob.dm", "comob.peptic_ulcer", "comob.other_cardiac", "comob.cerebrovas", "comob.chro_res", "comob.ihd", "comob.other", "comob.cancer", "comob.ccf", "comob.impair_vision", "comob.amputation", "comob.chron_liver", "comob.peri_vas", "comob.psy", "comob.GI", "comob.cvd", "comob.tb", "comob.ment_retard", "comob.dementia", "comob.sub_abuse")
+
+comp <- comp[,col_order]
+
+
 ## double check the data structure of the "comp" data frame 
-str(comp)   #status     : numeric 
-            #day_diag   : difftim 
-            #day_pd     : difftime 
-            #month_diag : difftime
-            #month_pd   : difftime
-            #event      : numeric 
-            #time       : difftime
-            #death      : numeric 
-            #PtAssist   : numeric 
-            #dm         : numeric 
-            #comob.hpt  : numeric 
-            #comob.dm   : numeric 
-            #brand      : numeric 
-            #Age_group  : numeric
+str(comp)   
 
 # Change variables back to factor 
-a <- c("status", "event", "death", "PtAssist", "dm", "comob.hpt", "comob.dm","brand", "Age2")
+a <- c("status","death", "PtSex", "PtRace","Age2", "PtAssist", "PtRenal1","dm","gl","uro","neph","hpt","AD","her.neph", "brand", "site", "PDSystem", "PDRegimen","SDPID.y","comob.hpt", "comob.dm", "comob.peptic_ulcer", "comob.other_cardiac", "comob.cerebrovas", "comob.chro_res", "comob.ihd", "comob.other", "comob.cancer", "comob.ccf", "comob.impair_vision", "comob.amputation", "comob.chron_liver", "comob.peri_vas", "comob.psy", "comob.GI", "comob.cvd", "comob.tb", "comob.ment_retard", "comob.dementia", "comob.sub_abuse")
 comp[,a]<-lapply(comp[,a], factor)
 
 # change variable from difftime to numeric 
-b <- c("day_diag", "day_pd", "month_diag", "month_pd", "time", "m.time")
+b <- c("month_diag", "month_pd", "time", "m.time")
 comp[,b]<-sapply(comp[,b], as.numeric)
 
-
+## check again the data structure of the "comp" data frame 
+str(comp)   #all OK
 ```
+
+--- End of Data Wrangling --- 

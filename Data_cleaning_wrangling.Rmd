@@ -968,7 +968,7 @@ label(comp$PtRace)          <- "Race"
 label(comp$PtAssist)        <- "PD Assistance"
 label(comp$dm)              <- "Diabetes"
 label(comp$gl)              <- "Glomerulonephritis"
-label(comp$uro)             <- "Obstructive uropathy"
+label(comp$uro)             <- "Obstructive uropathy"   #no subject has this issue 
 label(comp$neph)            <- "Drugs/toxic nephropathy"
 label(comp$hpt)             <- "Hypertension"
 label(comp$AD)              <- "ADPKD"
@@ -1032,5 +1032,8 @@ my.render.cat <- function(x) {
 #	render.continuous=my.render.cont, render.categorical=my.render.cat)
 
 
+### output the final dataset as .csv 
+library(data.table)
+fwrite(comp, "comp.csv") #fastest way to write a csv file 
 
 ```

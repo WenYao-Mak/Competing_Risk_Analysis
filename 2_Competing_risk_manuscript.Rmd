@@ -26,8 +26,6 @@ classoption: a4paper
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
-
 ```{r ff_final, eval=T, echo=F, cache=F, results=F, warning=F, message=F}
 
 
@@ -158,7 +156,28 @@ comp = comp %>%
   relocate(status_dss, .after=status_os) %>%
   relocate(status_crr, .after=status_dss)
 
+# KM ANALYSIS FOR THE WHOLE COHORT 
+# to plot survival stratified by  single grouping variable, substitute "survival_object~1" by "survival_object~factor" 
 
+survival_object = comp %$% #beware of the exposition paramter, and NOT %>%
+  Surv(time = m.time, status_os)
+
+#overall survival in whole cohort 
+ my_survfit = survfit(survival_object ~ 1, data = comp)
+ my_survfit  #1149 patients, 418 events 
+
+#Life table 
+# A tabular form of KM plot that shows survival as a proportion, together with confidence limits 
+summary(my_survfit, times = c(0, 12, 24, 36, 48, 60))
+
+# Kaplan Meier Plot 
+dependent_os = "Surv(time/30, status_os)"
+explanatory = 1
+
+ comp %>%
+   surv_plot(dependent_os, explanatory, pval=TRUE)
+ 
+ 
 # COX PROPORTIONAL HAZARD REGRESSION 
 
 #Univariable and multivariable models 
@@ -307,6 +326,50 @@ tab1 <- comp %>%
   dependent_label(comp, "Survival") %>%
     mykable()
 
+# guide form Emily Zabor: https://www.emilyzabor.com/tutorials/survival_analysis_in_r_tutorial.html#Part_3:_Competing_Risks 
+# Cumulative incidence in peritonitis data 
+library(cmprsk)
+
+cuminc(comp$m.time, comp$status, cencode = 2)
+
+
+# Plot the cumulative incidence in base R 
+
+ci_fit <- 
+  cuminc(
+    ftime = comp$m.time,
+    fstatus = comp$status,
+    cencode = 0  #what is cencode really? 
+  )
+
+plot(ci_fit)
+
+# plot from ggcompetingrisks 
+library(survminer)
+ggcompetingrisks(ci_fit)
+
+# compare CI between groups 
+
+ci_brand <- 
+  cuminc(
+    ftime = comp$m.time,
+    fstatus = comp$status,
+    group = comp$brand,
+    cencode = 0  #what is cencode really? 
+  )
+
+ci_brand[["Tests"]]
+
+# plot CI according to group 
+ggcompetingrisks(
+  fit = ci_brand, 
+  multiple_panels = FALSE, #force all graphs to be plotted in a single panel 
+  xlab = "Months", 
+  ylab = "Cumulative incidence of event", 
+  title = "Peritonitis", 
+  ylim = c(0,1)
+)
+
 
 ```
 
@@ -340,6 +403,23 @@ tab1
 ```
 
 ## Crude risks 
+
+(contrast dash line and solid lines - KM vs CI competing risks)
+
+```{r KM, eval=T, echo=F, cache=F, results=F, warning=F, message=F}
+library(survival)
+library(magrittr)
+
+
+
+```
+
+
+
+
+
+
+
 
 
 

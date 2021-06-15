@@ -1,0 +1,837 @@
+---
+title: 'Risk of peritonitis in Malaysian incident PD patients: a competing risks approach'
+author: "Mak Wen Yao, Ong Loke Meng"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  word_document: default
+fontsize: 12pt
+header-includes:
+- \usepackage{booktabs}
+- \usepackage{longtable}
+- \usepackage{array}
+- \usepackage{multirow}
+- \usepackage{xcolor}
+- \usepackage{wrapfig}
+- \usepackage{float}
+- \usepackage{colortbl}
+- \usepackage{pdflscape}
+- \usepackage{tabu}
+- \usepackage{threeparttable}
+- \usepackage[normalem]{ulem}
+mainfont: Arial
+classoption: a4paper
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r cleaning,eval=T,echo=F, cache=T, results=F, warning=F, message=F}
+library(tidyverse)
+# | Phase 1 competing risk 
+sh1_patient <- read_csv("Sh1_Patient.csv")
+sh3_AR <- read_csv("Sh2_PtAnnualAR.csv")
+sh4_notif <- read_csv("Sh4_PtNotif.csv")
+sh5_comorb <- read_csv("Sh5_PtNotifComorb.csv")
+sh6_lab <- read_csv("Sh6_PtNotifLab.csv")
+sh7_outcome <- read_csv("Sh7_PtNotifOutcome.csv")
+sh8_peri <- read_csv("Sh8_PtNotifPDPeri.csv")
+
+sh9_periAB <- read_csv("Sh9_PtNotifPDPeriAB.csv")
+sh10_pdperiperf <- read_csv("Sh10_PtNotifPDPeriPerf.csv")
+sh11_pdsys <- read_csv("Sh11_PtNotifPDSystem.csv")
+sh12_sero <- read_csv("Sh12_PtNotifSerology.csv")
+sh13_sdp <- read_csv("Sh13_SDP.csv")
+
+```
+
+```{r sh1,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
+#Step 1: clarify the data structure 
+str(sh1_patient) #Date format ok, others should be factor 
+
+x<-c("PatientID","PtSex","PtCitizenship","PtRace","PtABO") 
+sh1_patient[,x]<-lapply(sh1_patient[,x],factor) #use lapply() to iteratively convert to factor variables 
+
+#Step 2: identify duplicate patients 
+which(duplicated(sh1_patient$PatientID)) #all unique patients 
+
+#Step 3: identify ANY missing data 
+which(is.na(sh1_patient)) #no missing data
+
+#Step 4: Explore & enrich the data 
+
+### 4.1: histogram for Race, and Blood-group 
+library(DataExplorer)
+plot_bar(sh1_patient$PtSex)         #Male=1, Female=2
+plot_bar(sh1_patient$PtCitizenship) #Malaysian=1
+plot_bar(sh1_patient$PtRace)        #Malay=1, Chi=2, Ind=3, BumiSabah=4
+                                    #BumiSarawak=5, OrgAsliSemj=7, OtherMsian=19, 
+                                    #Foreigner=20
+plot_bar(sh1_patient$PtABO)         #A=1, B=2, AB=3, O=4, NA=8888, missing=9999
+#note: some patients blood-group (PtABO) is "not available"; variable will not be used.
+
+### 4.2: convert dob to age ###
+sh1_patient['Age']<-NA #create a new variable called "Age"
+sh1_patient['givendate']<-as.Date("31-12-2018", format="%d-%m-%Y")
+
+library(lubridate) #use the lubridate package for dates 
+sh1_patient$Age<- interval(start=sh1_patient$PtDateBirth, end=sh1_patient$givendate)/duration(num = 1, units = "years") 
+
+ggplot(sh1_patient, aes(x=Age)) + 
+  geom_histogram()                  #histogram shows negative age 
+
+#   |to identify which patients had negative age 
+subset(sh1_patient, sh1_patient$givendate < sh1_patient$PtDateBirth) #70695,71570
+sh1_patient$PtDateBirth[which(sh1_patient$PatientID==70695)]<- as.Date("1929-07-16") #no need to specify "format", or else will turn into NA 
+sh1_patient$PtDateBirth[which(sh1_patient$PatientID==71570)]<- as.Date("1929-09-04")
+
+#   |re-run age calculation 
+sh1_patient$Age<- interval(start=sh1_patient$PtDateBirth, end=sh1_patient$givendate)/duration(num = 1, units = "years") 
+
+ggplot(sh1_patient, aes(x=Age)) + 
+  geom_histogram()                  #skewness to the left 
+
+```
+
+```{r sh3,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
+
+#Step 1: clarify the data structure 
+str(sh3_AR) #PtARID, PatientID, NotifID, SDPID, PtAssist should be factor 
+x<-c("PtARID", "PatientID", "NotifID","PtRRTID", "SDPID")
+sh3_AR[,x]<-lapply(sh3_AR[,x],factor)
+
+#Step 2: identify duplicate patients 
+which(duplicated(sh3_AR$PatientID)) #show multiple entries from same patients 
+
+#Step 3: identify ANY missing data 
+which(is.na(sh3_AR))                #no missing data 
+ 
+#Step 4: Explore & enrich the data 
+
+## 4.1: arrange row according to PatientID then DataYear 
+sh3_AR<-arrange(sh3_AR,PatientID, DataYear) #some patients did not return the following year -> died? lost to f/up?
+
+## 4.2: identify which PtAssist changed / deteriorates 
+#plot_bar(sh3_AR$PtAssist)
+which(sh3_AR$PtAssist==8888) #26 rows has NA for PtAssist 
+sh3_AR$PtAssist[which(sh3_AR$PtAssist==8888)]<-NA
+which(is.na(sh3_AR$PtAssist)) #all 26 rows converted to NA
+
+## 4.2.1: PtAssist Changed from the year before 
+sh3_AR<-sh3_AR %>%
+  group_by(PatientID) %>%
+  mutate(Asst.change=ifelse(PtAssist==lag(PtAssist), 0, 1) ) #lag() the previous row
+
+sh3_AR$Asst.change[which(is.na(sh3_AR$Asst.change))]<-0
+
+## 4.2.2: PtAssist deteriorated from the year before 
+sh3_AR<-sh3_AR %>%
+  group_by(PatientID) %>%
+  mutate(deteriorate=ifelse(PtAssist>lag(PtAssist), 1, 0)) #lag() the previous row
+
+sh3_AR$deteriorate[which(is.na(sh3_AR$deteriorate))]<-0
+
+
+## Create a new sub-data that contains latest DataYear
+## Will sacrifice some details in PtAssist over time 
+sh3_AR<-arrange(sh3_AR, PatientID, desc(DataYear))
+
+library(data.table)
+setDT(sh3_AR)
+sh3_AR2<-sh3_AR[rowid(rleid(PatientID)) == 1]
+sh3_AR2<-subset(sh3_AR2, select =  -c(8:9))
+
+``` 
+
+```{r sh4,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
+
+#Step 1: clarify the data structure 
+str(sh4_notif)    #A few issues: 
+                  #PatientID, NotifID, PtRRTID, SDPID - factor
+                  #PtDateCommence, PtDateCentre, ESRFDateFirstRx - date 
+                  #PtAssis - no.obs less than sh3_AR; ignore PtAssist in sh4_notif 
+                  #Modality in 'character' but all should be PD pt; ignore 
+
+x<-c("PatientID", "NotifID","PtRRTID", "SDPID")
+sh4_notif[,x]<-lapply(sh4_notif[,x],factor)
+
+func<- function(x) as.Date(x,format = "%d-%m-%y") #create a function to convert to Date
+sh4_notif[,6:8]<-data.frame(lapply(sh4_notif[,6:8], func)) #lapply() to convert to Date
+
+sh4_notif<-subset(sh4_notif, select= -c(15))
+
+sh4_notif$PtRenal1<-as.factor(sh4_notif$PtRenal1)
+
+#Step 2: identify duplicate patients 
+sh4_notif<-arrange(sh4_notif, PatientID, PtDateCentre) #arrange by PtDateCentre; 
+                                                       #repeated entry due to patient 
+                                                       #changing treatment site 
+which(duplicated(sh4_notif$PatientID))                 #69 repeat entries by PatientID 
+
+## 2.1: subset patients who changed site -> ESRFDate not complete/missing 
+sh4_subset<- sh4_notif %>%
+  group_by(PatientID) %>%
+  filter(n()!=1)               #this method produce 129 observations 
+  
+  
+sh4_subset<-subset(sh4_notif, (duplicated(sh4_notif$PatientID) | duplicated(sh4_notif$PatientID, fromLast = TRUE)))     # this also produce 129 obs
+
+#only one subject show different ESRFDateFirstRx; 66565 (SDPID 530)
+sh4_notif$ESRFDateFirstRx[which(sh4_notif$PatientID==66565 & sh4_notif$SDPID==530)]<-as.Date("2013-03-20")
+
+## Data exploration with sh4_subset 
+##  | Aim to remove duplicate and see if any vital data gone missing 
+sh4_subset$ESRFDateFirstRx[which(sh4_subset$PatientID==66565 & sh4_subset$SDPID==530)]<-as.Date("2013-03-20")
+sh4_subset<-arrange(sh4_subset, PatientID, ESRFDateFirstRx)
+
+##  | Use rleid() to generate run-length type group ID 
+setDT(sh4_subset)
+sh4_subset<-sh4_subset[rowid(rleid(PatientID)) == 1]
+
+#75148, 75322, 75339, 75781, 75782: 5 pt missing PtRenal1
+#double-check original dataset, confirm all 5 data fields missing
+
+#before we make any changes to ESRFDateFirstRx, arrange() the dataset by PatientID, ESRFDateFirstRx
+sh4_notif<-sh4_notif %>%
+  group_by(PatientID) %>%
+  arrange(sh4_notif, ESRFDateFirstRx, .by_group = TRUE)
+#change ESRFDateFirstRx to character 
+sh4_notif$ESRFDateFirstRx<-as.character(sh4_notif$ESRFDateFirstRx)
+
+sh4_notif<- sh4_notif %>% 
+  group_by(PatientID) %>%
+  fill(ESRFDateFirstRx)
+#change ESRFDateFirstRx back to date 
+sh4_notif$ESRFDateFirstRx<-as.Date(sh4_notif$ESRFDateFirstRx)
+
+#na_bool = is.na(sh4_notif$ESRFDateFirstRx)
+#sh4_notif[na_bool,]$ESRFDateFirstRx=sh4_notif[c(FALSE, na_bool[-length(na_bool)]),]$ESRFDateFirstRx #shift the value up if ESRFDateFirstRx is NA
+
+## 2.2: PtRenal1 
+plot_bar(sh4_notif$PtRenal1) #quite some patient w/out valid reasons 
+
+#Step 3: identify ANY missing data 
+which(is.na(sh4_notif[,8])) #index 668 & 1217 have real missing data; 
+                            #PatientID:72535,1003737
+                            #should we assume that ESRF date starts with Dialysis date? Yes 
+
+sh4_notif$ESRFDateFirstRx[which(sh4_notif$PatientID==72535)]<-as.Date("2014-10-12")
+sh4_notif$ESRFDateFirstRx[which(sh4_notif$PatientID==1003737)]<-as.Date("2014-12-21")
+                            
+
+#Step 4: Explore & enrich the data 
+
+## 4.1: create two new variables "times since diagnosis" and "time since 1st PD"
+sh4_notif['day_diag'] <- NA
+sh4_notif['day_pd'] <- NA 
+sh4_notif['givendate']<-NA 
+
+sh4_notif$givendate <- as.Date("31-12-2018", format="%d-%m-%Y")
+sh4_notif$day_pd <- sh4_notif$givendate - sh4_notif$PtDateCommence
+sh4_notif$day_diag <- sh4_notif$givendate - sh4_notif$ESRFDateFirstRx #the two cases above will have time calculated from PtDateCommence  
+                                                      
+## 4.2: remove all the duplicates
+setDT(sh4_notif)
+sh4_notif<-sh4_notif[rowid(rleid(PatientID)) == 1] #final dataset has 1149 obs
+
+``` 
+
+```{r sh5,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
+
+#Step 1: clarify the data structure 
+str(sh5_comorb) #Issues identified 
+                #PtNotifComorbidityID, PatientID, NotifID, PtRRTID, SDPID, Comorbidity - factor 
+                #Drop DateDiagnosis, DateDiagnosis_Est, DateDiagnosis_Unk, DateResolve - all missing 
+
+x<-c("PtNotifComorbidityID", "PatientID", "NotifID", "PtRRTID", "SDPID", "Comorbidity")
+sh5_comorb[,x]<-lapply(sh5_comorb[,x], factor)
+
+sh5_comorb<-subset(sh5_comorb, select = -c(8:11)) 
+
+#Step 2: identify duplicate patients 
+which(duplicated(sh5_comorb$PatientID)) #PatientID repeated for multiple comorbidities 
+                                        #Should convert long to wide, each comorb is a variable 
+                                        #See Step 4 for details 
+
+#Step 3: identify ANY missing data 
+which(is.na(sh5_comorb[,1:8])) #no missing data
+
+#Step 4: Explore & enrich the data 
+
+## 4.1: convert the column "Comorbidity" from long to wide
+## | use the newer pivot_wider() from tidyverse/tidyr to make the conversion 
+## | add a new column to indicate comorb is "present" 
+sh5_comorb['comob_present']<-as.integer(1)
+class(sh5_comorb$comob_present)
+
+sh5_comorb <- subset(sh5_comorb, select = c(2,8,10))
+sh5_comorb<-as_tibble(sh5_comorb)
+
+sh5_comorb<-  sh5_comorb %>% 
+  pivot_wider(
+    names_from = Comorbidity,
+    values_from = comob_present)
+
+    
+    #    values_fill = as.list("0")    #must force the "0" as the "list" type, or else it wouldnt work
+  
+
+## |Comorbidity type (change column name)
+## comob.hpt, comob.dm, comob.peptic_ulcer, comob.other_cardiac, comob.cerebrovas, comob.chro_res, comob.ihd, comob.other, comob.cancer, comob.ccf, comob.impair_vision, comob.amputation, comob.chron_liver, comob.peri_vas, comob.psy, comob.GI, comob.cvd, comob.tb, comob.ment_retard, comob.dementia, comob.sub_abuse, 
+
+## rename all columns 
+
+names(sh5_comorb)<- c("PatientID", "comob.hpt", "comob.dm", "comob.peptic_ulcer", "comob.other_cardiac", "comob.cerebrovas", "comob.chro_res", "comob.ihd", "comob.other", "comob.cancer", "comob.ccf", "comob.impair_vision", "comob.amputation", "comob.chron_liver", "comob.peri_vas", "comob.psy", "comob.GI", "comob.cvd", "comob.tb", "comob.ment_retard", "comob.dementia", "comob.sub_abuse")
+
+sh5_comorb$comob.dm[which(sh5_comorb$comob.dm=="NULL")]<-"0"
+sh5_comorb$comob.hpt[which(sh5_comorb$comob.hpt=="NULL")]<-"0"
+sh5_comorb$comob.peptic_ulcer[which(sh5_comorb$comob.peptic_ulcer=="NULL")]<-"0"
+sh5_comorb$comob.other_cardiac[which(sh5_comorb$comob.other_cardiac=="NULL")]<-"0"
+sh5_comorb$comob.cerebrovas[which(sh5_comorb$comob.cerebrovas=="NULL")]<-"0"
+sh5_comorb$comob.chro_res[which(sh5_comorb$comob.chro_res=="NULL")]<-"0"
+sh5_comorb$comob.ihd[which(sh5_comorb$comob.ihd=="NULL")]<-"0"
+sh5_comorb$comob.other[which(sh5_comorb$comob.other=="NULL")]<-"0"
+sh5_comorb$comob.cancer[which(sh5_comorb$comob.cancer=="NULL")]<-"0"
+sh5_comorb$comob.ccf[which(sh5_comorb$comob.ccf=="NULL")]<-"0"
+sh5_comorb$comob.impair_vision[which(sh5_comorb$comob.impair_vision=="NULL")]<-"0"
+sh5_comorb$comob.amputation[which(sh5_comorb$comob.amputation=="NULL")]<-"0"
+sh5_comorb$comob.chron_liver[which(sh5_comorb$comob.chron_liver=="NULL")]<-"0"
+sh5_comorb$comob.peri_vas[which(sh5_comorb$comob.peri_vas=="NULL")]<-"0"
+sh5_comorb$comob.psy[which(sh5_comorb$comob.psy=="NULL")]<-"0"
+sh5_comorb$comob.GI[which(sh5_comorb$comob.GI=="NULL")]<-"0"
+sh5_comorb$comob.cvd[which(sh5_comorb$comob.cvd=="NULL")]<-"0"
+sh5_comorb$comob.tb[which(sh5_comorb$comob.tb=="NULL")]<-"0"
+sh5_comorb$comob.ment_retard[which(sh5_comorb$comob.ment_retard=="NULL")]<-"0"
+sh5_comorb$comob.dementia[which(sh5_comorb$comob.dementia=="NULL")]<-"0"
+sh5_comorb$comob.sub_abuse[which(sh5_comorb$comob.sub_abuse=="NULL")]<-"0"
+
+sh5_comorb$PatientID<-as.character(sh5_comorb$PatientID)
+
+sh5_comorb$comob.dm[which(sh5_comorb$comob.dm=="1")]<-1
+sh5_comorb$comob.hpt[which(sh5_comorb$comob.hpt=="1")]<-1
+sh5_comorb$comob.hpt[which(sh5_comorb$PatientID=="78556")]<-1
+sh5_comorb$comob.peptic_ulcer[which(sh5_comorb$comob.peptic_ulcer=="1")]<-1
+sh5_comorb$comob.other_cardiac[which(sh5_comorb$comob.other_cardiac=="1")]<-1
+sh5_comorb$comob.cerebrovas[which(sh5_comorb$comob.cerebrovas=="1")]<-1
+sh5_comorb$comob.chro_res[which(sh5_comorb$comob.chro_res=="1")]<-1
+sh5_comorb$comob.ihd[which(sh5_comorb$comob.ihd=="1")]<-1
+sh5_comorb$comob.other[which(sh5_comorb$comob.other=="1")]<-1
+sh5_comorb$comob.cancer[which(sh5_comorb$comob.cancer=="1")]<-1
+sh5_comorb$comob.ccf[which(sh5_comorb$comob.ccf=="1")]<-1
+sh5_comorb$comob.impair_vision[which(sh5_comorb$comob.impair_vision=="1")]<-1
+sh5_comorb$comob.amputation[which(sh5_comorb$comob.amputation=="1")]<-1
+sh5_comorb$comob.chron_liver[which(sh5_comorb$comob.chron_liver=="1")]<-1
+sh5_comorb$comob.peri_vas[which(sh5_comorb$comob.peri_vas=="1")]<-1
+sh5_comorb$comob.psy[which(sh5_comorb$comob.psy=="1")]<-1
+sh5_comorb$comob.GI[which(sh5_comorb$comob.GI=="1")]<-1
+sh5_comorb$comob.cvd[which(sh5_comorb$comob.cvd=="1")]<-1
+sh5_comorb$comob.tb[which(sh5_comorb$comob.tb=="1")]<-1
+sh5_comorb$comob.ment_retard[which(sh5_comorb$comob.ment_retard=="1")]<-1
+sh5_comorb$comob.dementia[which(sh5_comorb$comob.dementia=="1")]<-1
+sh5_comorb$comob.sub_abuse[which(sh5_comorb$comob.sub_abuse=="1")]<-1
+
+
+sh5_comorb$comob.dm<-as.numeric(sh5_comorb$comob.dm)
+sh5_comorb$comob.hpt<-as.numeric(sh5_comorb$comob.hpt) #Id 78556
+sh5_comorb$comob.peptic_ulcer<-as.numeric(sh5_comorb$comob.peptic_ulcer)
+sh5_comorb$comob.other_cardiac<-as.numeric(sh5_comorb$comob.other_cardiac)
+sh5_comorb$comob.cerebrovas<-as.numeric(sh5_comorb$comob.cerebrovas)
+sh5_comorb$comob.chro_res<-as.numeric(sh5_comorb$comob.chro_res)
+sh5_comorb$comob.ihd<-as.numeric(sh5_comorb$comob.ihd)
+sh5_comorb$comob.other<-as.numeric(sh5_comorb$comob.other)
+sh5_comorb$comob.cancer<-as.numeric(sh5_comorb$comob.cancer)
+sh5_comorb$comob.ccf<-as.numeric(sh5_comorb$comob.ccf)
+sh5_comorb$comob.impair_vision<-as.numeric(sh5_comorb$comob.impair_vision)
+sh5_comorb$comob.amputation<-as.numeric(sh5_comorb$comob.amputation)
+sh5_comorb$comob.chron_liver<-as.numeric(sh5_comorb$comob.chron_liver)
+sh5_comorb$comob.peri_vas<-as.numeric(sh5_comorb$comob.peri_vas)
+sh5_comorb$comob.psy<-as.numeric(sh5_comorb$comob.psy)
+sh5_comorb$comob.GI<-as.numeric(sh5_comorb$comob.GI)
+sh5_comorb$comob.cvd<-as.numeric(sh5_comorb$comob.cvd)
+sh5_comorb$comob.tb<-as.numeric(sh5_comorb$comob.tb)
+sh5_comorb$comob.ment_retard<-as.numeric(sh5_comorb$comob.ment_retard)
+sh5_comorb$comob.dementia<-as.numeric(sh5_comorb$comob.dementia)
+sh5_comorb$comob.sub_abuse<-as.numeric(sh5_comorb$comob.sub_abuse)
+sh5_comorb$PatientID<-as.numeric(sh5_comorb$PatientID)
+
+
+
+``` 
+
+```{r sh7,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
+
+#Step 1: clarify the data structure 
+str(sh7_outcome)  #Similar issues as previous sheets 
+                  #PtNotifOutcomeID, PatientID, NotifID, PtRRTID, SDPID - factor 
+                  #Other outcome variables should be in "factor" format but leave them be numeric for now 
+
+x<-c("PtNotifOutcomeID", "PatientID", "NotifID", "PtRRTID", "SDPID", "PtOutcomeID")
+sh7_outcome[,x]<-lapply(sh7_outcome[,x], factor)
+
+sh7_outcome$PtDateOutcome <- as.Date(sh7_outcome$PtDateOutcome, format = "%d-%m-%y")
+sh7_outcome$PtDateOutcomeNotified <- as.Date(sh7_outcome$PtDateOutcomeNotified, format="%d-%m-%y")
+
+
+#Step 2: identify duplicate patients 
+sh7_outcome<-arrange(sh7_outcome, PatientID, PtDateOutcome)
+
+which(duplicated(sh7_outcome$PatientID))  #identify 172 duplicated records - multiple outcomes by the same patient 
+
+#Step 3: identify ANY missing data 
+
+## 3.1: important variable is the "PtDateOutcome. Missing values in PtDateOutcomeNotified are ignored
+which(is.na(sh7_outcome$PtDateOutcome))  #no missing data 
+
+
+#Step 4: Explore & enrich the data 
+
+## 4.1: check if "death" (terminal event) occurs befor any other outcome; death ==1 
+sh7_outcome2<-subset(sh7_outcome, !sh7_outcome$PtOutcomeID==0)
+sh7_outcome2<- sh7_outcome2[,1:9]
+
+sh7_outcome3<- sh7_outcome2 %>%
+  group_by(PatientID, desc(PtOutcomeID)) %>%
+  filter(n()!=1) %>%
+  mutate(wrong=ifelse((PtDateOutcome > lag(PtDateOutcome)),1,0)) #No event occurs after death; 
+
+## 4.2: drop the column "modality" 
+sh7_outcome<-subset(sh7_outcome, select =  -c(5))
+
+## 4.3: drop the row with PtOutcomeID == 5 (move to other centre)
+sh7_outcome<-subset(sh7_outcome, !(PtOutcomeID==5 | PtOutcomeID==0))
+plot_bar(sh7_outcome$PtOutcomeID)
+
+## 4.3: shorten the column 
+sh7_outcome<-subset(sh7_outcome, select = c(1:9))
+``` 
+
+```{r sh8,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
+
+#Step 1: clarify the data structure 
+str(sh8_peri)     #A few issues
+                  #PtNotifPDPeriID, PatientID, NotifID, PtRRTID, SDPID, PtARID, PeritonitisType - Factor 
+                  #DatePeri - Date
+
+x<-c("PtNotifPDPeriID", "PatientID", "NotifID", "PtRRTID", "SDPID", "PtARID")
+sh8_peri[,x]<-lapply(sh8_peri[,x], factor)
+
+sh8_peri$DatePeri<-as.Date(sh8_peri$DatePeri, format="%d-%m-%y")
+
+#Step 2: identify duplicate patients 
+which(duplicated(sh8_peri$PatientID)) #541 repeated instances 
+
+#Step 3: identify ANY missing data 
+## | important variabls are DatePeri and PeritonitisType 
+which(is.na(sh8_peri$DatePeri) | is.na(sh8_peri$PeritonitisType)) #no missing data
+
+#Step 4: Explore & enrich the data 
+## | arrange according to PatientID and DatePeri, and complete the remaining analysis in following sections
+
+sh8_peri<-sh8_peri %>%
+  arrange(PatientID, DatePeri)
+
+sh8_peri<-subset(sh8_peri,select= c(1:9))
+
+
+##  | some issues identified from preliminary analysis: 
+##    1. Wrong PtDateOutcome (!) 70674, peri 2005-09-17;  75995 peri 2006-10-23; 
+##    2. 70766, move to other centre, 2014-03-01; 
+##    3. 72388, ESI 2014-09-01; 74135, peri 2014-05-19;76595 peri 2014-02-08 (date ESI is correct, need to check PtDateCommence)
+
+# Step 1: Correct wrong data entry (PatientID == 70674, 75995)
+sh8_peri$DatePeri[(sh8_peri$PatientID==70674 & sh8_peri$PtNotifPDPeriID==11619)]<-as.Date("2015-09-17")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==75995 |sh8_peri$PtNotifPDPeriID==13695)]<-as.Date("2016-10-23") #this subject reported multipl ESI & peri on the same date 
+
+# Step 2: Cannot verify date of peri, possibly experience before formally enrolled in dialysis program 
+# to remove the incidents 
+which(sh8_peri$PatientID==72388 & sh8_peri$PtNotifPDPeriID==10874) #index 612
+sh8_peri<-sh8_peri[-612,]
+
+which(sh8_peri$PatientID==74135 & sh8_peri$PtNotifPDPeriID==10309) #index 715
+sh8_peri<-sh8_peri[-715,]
+
+which(sh8_peri$PatientID==76595 & sh8_peri$PtNotifPDPeriID==11103) #index 1049
+sh8_peri<-sh8_peri[-1049,]
+
+# Step 3: Remove ESI from cases where ESI and Peritonitis co-exist on the SAME DATE 
+sh8_peri2<- sh8_peri %>% 
+  group_by(PatientID, DatePeri) %>%
+  filter(n()!=1) %>%
+  filter(DatePeri == lead(DatePeri))
+
+x<-which(sh8_peri$DatePeri == lead(sh8_peri$DatePeri)) 
+
+sh8_peri <- sh8_peri[-c(129,258,261,303,346,349,425,521,562,619,621,637,646,680,757,778,877,921,933,976,977,978,1031),]
+
+# Double check if the removal is successful 
+which(sh8_peri$DatePeri == lead(sh8_peri$DatePeri)) 
+
+# Step 4: Many subjects have same date peritonitis with PtDateCommence 
+#      4.1: Some subjects have same peritonitis date with death or transfer to HD 
+
+#70408, 2014-05-12 +1
+#70417, 2017-05-15 (same date as transfer to HD) -1
+#70685, 2014-03-23  +1
+#70687, 2014-04-27 +1
+#70715, 2015-03-30 (same date as death) -1
+#70854, 2017-06-17 (same date as death) -1
+#71669, 2014-08-04 +1
+#73942, 2014-08-04 +1
+#74147, 2017-07-17 (same date as transfer to HD) -1
+#76181, 2016-10-17 (same date as transfer to HD) -1
+#76394, 2017-11-18 (same date as death) -1
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==70408 |sh8_peri$PtNotifPDPeriID==11016)]<-as.Date("2014-05-14")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==70685 |sh8_peri$PtNotifPDPeriID==10254)]<-as.Date("2014-03-25")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==70687 |sh8_peri$PtNotifPDPeriID==10260)]<-as.Date("2014-04-29")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==71669 |sh8_peri$PtNotifPDPeriID==10705)]<-as.Date("2014-08-06")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==73942 |sh8_peri$PtNotifPDPeriID==10250)]<-as.Date("2014-08-06")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==70417 |sh8_peri$PtNotifPDPeriID==16027)]<-as.Date("2017-05-13")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==70715 |sh8_peri$PtNotifPDPeriID==12029)]<-as.Date("2015-03-28")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==70854 |sh8_peri$PtNotifPDPeriID==14790)]<-as.Date("2017-06-15")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==74147 |sh8_peri$PtNotifPDPeriID==15678)]<-as.Date("2017-07-15")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==76181 |sh8_peri$PtNotifPDPeriID==13873)]<-as.Date("2016-10-16")
+
+sh8_peri$DatePeri[(sh8_peri$PatientID==76394 |sh8_peri$PtNotifPDPeriID==15339)]<-as.Date("2017-11-16")
+
+## Step 5: Some patients have double entry 
+#rep<-sh8_peri %>%
+#  group_by(PatientID, PtDateOutcome) %>%
+#  filter(n()!=1) %>% #a total of 5 unique subject id with 18 obs 
+#  filter(PtDateOutcome==lead(PtDateOutcome)) #this filters down to 13 obs (correctly minus 5)
+
+
+
+
+which(sh8_peri$PatientID==70685 & sh8_peri$PtNotifPDPeriID==10254)
+which(sh8_peri$PatientID==71669 & sh8_peri$PtNotifPDPeriID==10705)
+which(sh8_peri$PatientID==71669 & sh8_peri$PtNotifPDPeriID==13614)
+which(sh8_peri$PatientID==71669 & sh8_peri$PtNotifPDPeriID==13615)
+which(sh8_peri$PatientID==71669 & sh8_peri$PtNotifPDPeriID==13616)
+which(sh8_peri$PatientID==71669 & sh8_peri$PtNotifPDPeriID==13617)
+which(sh8_peri$PatientID==71669 & sh8_peri$PtNotifPDPeriID==13618)
+which(sh8_peri$PatientID==71669 & sh8_peri$PtNotifPDPeriID==13619)
+which(sh8_peri$PatientID==71669 & sh8_peri$PtNotifPDPeriID==13620)
+which(sh8_peri$PatientID==73942 & sh8_peri$PtNotifPDPeriID==10250)
+which(sh8_peri$PatientID==76181 & sh8_peri$PtNotifPDPeriID==12162)
+which(sh8_peri$PatientID==76181 & sh8_peri$PtNotifPDPeriID==13872)
+which(sh8_peri$PatientID==76394 & sh8_peri$PtNotifPDPeriID==15337)
+
+
+#index 394,531,532,533,534,535,536,537,538,673,992,993,1016
+sh8_peri <- sh8_peri[-c(394,531,532,533,534,535,536,537,538,673,992,993,1016),]
+  
+sh8_peri <- subset(sh8_peri, sh8_peri$PeritonitisType==2 )
+
+``` 
+
+```{r sh7_8, eval=T, echo=F, cache=T, results=FALSE, warning=FALSE, message=FALSE} 
+
+# combine both sh7 and sh8 into one outcome dataset 
+
+## Step 1: change the PeritonitisType to PtOutcomeID, and DatePeri to PtDateOutcome 
+##  | Peritonitis from 2-> 12; ESI from 1-> 13 
+sh8_peri$PeritonitisType[sh8_peri$PeritonitisType==2]<- 12
+sh8_peri$PeritonitisType[sh8_peri$PeritonitisType==1]<- 13
+
+##  | Rename column 
+sh8_peri<- rename(sh8_peri, PtOutcomeID=PeritonitisType)
+sh8_peri<- rename(sh8_peri, PtDateOutcome=DatePeri)
+
+##  | rbind both dataset with data.table()
+library(data.table)
+z = list(sh7_outcome, sh8_peri)
+sh7_8<- rbindlist(z, use.names = TRUE, fill = TRUE)
+
+#sh7_8<-merge(sh7_outcome, sh8_peri, by="PatientID", all = TRUE)
+
+## Step 2: re-arrange the new combined dataset with PatientID 
+sh7_8<-arrange(sh7_8, PatientID, PtDateOutcome)
+
+which(is.na(sh7_8$PtOutcomeID) | is.na(sh7_8$PtDateOutcome)) #no missing data 
+
+## Step 3: create event; t.start, t.stop, time cannot create without PtOutcomeDate 
+
+sh7_8<-sh7_8 %>%
+  mutate(event=ifelse(PtOutcomeID==12, 1,0)) %>%
+  relocate(event, .after=PtOutcomeID)
+
+sh7_8 <- subset(sh7_8,select =  c(2:8))
+
+```
+
+```{r sh_demo, eval=T, echo=F, cache=T, results=FALSE, warning=FALSE, message=FALSE}
+
+# combine sh1, sh3, sh4, and sh5 to form a combined demographic dataset 
+
+library(data.table)
+#combine sh1_patient and sh5_comorb first 
+sh_demo1<-merge(sh1_patient, sh5_comorb, by="PatientID", all = TRUE)
+sh_demo2<-merge(sh_demo1, sh4_notif, by="PatientID", all=TRUE)
+sh_demo.fin<-merge(sh3_AR2,sh_demo2, by="PatientID", all = TRUE)
+
+sh_demo.fin<-arrange(sh_demo.fin, PatientID) #1149 obs 
+
+```
+
+```{r sh_11, eval=T, echo=F, cache=T, results=FALSE, warning=FALSE, message=FALSE}
+
+sh11_pdsys <- read_csv("Sh11_PtNotifPDSystem.csv")
+
+
+#Step 1: clarify the data structure 
+str(sh11_pdsys) #PDRegimen and PDSystem were both numeric variables 
+                #DateStart and DateEnd were character variables 
+
+x<-c("PDRegimen", "PDSystem", "PatientID")
+sh11_pdsys[,x]<-lapply(sh11_pdsys[,x], factor)
+
+sh11_pdsys$DateStart <- as.Date(sh11_pdsys$DateStart, format = "%d-%m-%y")
+sh11_pdsys$DateEnd <- as.Date(sh11_pdsys$DateEnd, format = "%d-%m-%y")
+
+#set PDRegimen ==8888 or 9999 to NA 
+sh11_pdsys$PDRegimen[which(sh11_pdsys$PDRegimen==8888 | sh11_pdsys$PDRegimen==9999)]<-NA
+
+sh11_pdsys <- sh11_pdsys %>%
+  group_by(PatientID) %>%
+  arrange(PatientID, DateStart) %>%
+  mutate(Index=row_number()) %>%
+  relocate(Index, .after=PDRegimen)
+
+which(is.na(sh11_pdsys$PDRegimen)&sh11_pdsys$Index==1) #1 (ID:1253), 79 (ID: 25299), 1601 (ID:70770), 1754 (ID: 71009)
+
+#change PDRegimen into a factor variable 
+sh11_pdsys$PDRegimen<- as.factor(sh11_pdsys$PDRegimen)
+
+sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==1253&sh11_pdsys$Index==1)]<-3
+sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==70770&sh11_pdsys$Index==1)]<-1
+sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==71009&sh11_pdsys$Index==1)]<-1
+sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==25299&sh11_pdsys$Index==1)]<-1
+
+#set PDSystem ==8888 or 9999 to NA 
+sh11_pdsys$PDSystem[which(sh11_pdsys$PDSystem==8888 | sh11_pdsys$PDSystem==9999)]<-NA
+
+sh11_pdsys<- relocate(sh11_pdsys, PDSystem, .after = Index)
+
+which(is.na(sh11_pdsys$PDSystem)&sh11_pdsys$Index==1) #1 (ID:1253), 79 (ID: 25299), 1601 (ID:70770), 1754 (ID: 71009)
+
+sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==1253&sh11_pdsys$Index==1)]<-101
+sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==70770&sh11_pdsys$Index==1)]<-101
+sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==71009&sh11_pdsys$Index==1)]<-101
+sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==25299&sh11_pdsys$Index==1)]<-101
+
+## Keep only the first row 
+sh11_pdsys <- sh11_pdsys %>%
+  arrange(PatientID, Index) %>%
+  filter(Index==1)
+
+which(is.na(sh11_pdsys$PDRegimen) | is.na(sh11_pdsys$PDSystem)) #no missing data 
+
+## trim the dataset to contain only PatientID, PDSystem, and PDRegimen 
+sh11_pdsys<- select(sh11_pdsys, c("PatientID", "PDSystem", "PDRegimen"))
+
+## create new variable for PDSystem as "brand" 
+sh11_pdsys['brand']<-NA
+sh11_pdsys$brand[which(sh11_pdsys$PDSystem==101|sh11_pdsys$PDSystem==102|sh11_pdsys$PDSystem==103|sh11_pdsys$PDSystem==104|sh11_pdsys$PDSystem==105|sh11_pdsys$PDSystem==106|sh11_pdsys$PDSystem==188|sh11_pdsys$PDSystem==199)]<- 1 #Baxter product
+
+sh11_pdsys$brand[which(sh11_pdsys$PDSystem==201|sh11_pdsys$PDSystem==202|sh11_pdsys$PDSystem==203|sh11_pdsys$PDSystem==204|sh11_pdsys$PDSystem==205|sh11_pdsys$PDSystem==206|sh11_pdsys$PDSystem==207|sh11_pdsys$PDSystem==288|sh11_pdsys$PDSystem==299)]<- 2 #Fresenius 
+
+sh11_pdsys$brand[which(sh11_pdsys$PDSystem==301|sh11_pdsys$PDSystem==388|sh11_pdsys$PDSystem==399)]<- 3 #Lucenxia
+
+sh11_pdsys$brand[which(is.na(sh11_pdsys$brand))]<-9
+```
+
+##### Fork to competing risk branch for peritonitis as outcome 
+```{r wrangle_cmprsk_peri, eval=T, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE}
+# need to redo the steps in all_data EXCEPT dropping patients with PtOutcomeID==0
+sh_final<-merge(sh7_8, sh_demo.fin, by="PatientID", all = TRUE)
+
+sh_final<-arrange(sh_final, PatientID, PtDateOutcome)
+
+## change column order 
+##  | col_order = c("PatientID", "PtDateOutcome","PtOutcomeID", "event", "PtDateCommence", "PtDateCentre", "ESRFDateFirstRx", "day_diag", "day_pd") 
+
+sh_final<-sh_final %>%
+  relocate(PtDateCommence, .after=PatientID) %>%
+  relocate(ESRFDateFirstRx, .after=PtDateCommence) %>%
+  relocate(PtDateOutcome, .after = ESRFDateFirstRx) %>%
+  relocate(PtOutcomeID, .after = PtDateOutcome) %>%
+  relocate(day_diag, .after = PtOutcomeID) %>%
+  relocate(day_pd, .after=day_diag) %>%
+  relocate(event, .after=day_pd)
+
+#If we don't drop PtOutcomeID==0, many rows will remain as NA
+
+sh_final$PtDateOutcome[which(is.na(sh_final$PtDateOutcome))]<- as.Date("2018-12-31")
+sh_final$event[which(is.na(sh_final$event))]<- 0 
+sh_final$PtOutcomeID[which(is.na(sh_final$PtOutcomeID))]<- 0
+
+# create t.start, tstop, time 
+sh_final<-sh_final %>%
+  mutate(t.start2=0) %>%
+  relocate(t.start2, .after=event) %>%
+  mutate(t.stop=PtDateOutcome - PtDateCommence) %>%
+  relocate(t.stop, .after=t.start2)
+
+sh_final<-sh_final %>%
+  group_by(PatientID) %>%
+  mutate(Index=row_number()) %>%
+  relocate(Index, .after=t.stop) 
+
+sh_final<-sh_final %>%
+  group_by(PatientID) %>%
+  mutate(t.start = ifelse(Index>1, lag(t.stop), 0)) %>%
+  relocate(t.start, .before=t.stop)
+  
+ ## sh_final$t.start[sh_final$Index>1]<-lead(sh_final$t.stop) #this doesn't work 
+
+## create a third duration variable 'time' 
+sh_final['time']<-sh_final$t.stop - sh_final$t.start
+sh_final<-relocate(sh_final, time, .after = t.stop)
+
+
+
+sh_final <- sh_final %>%
+  relocate(PtSex, .after=Index) %>%
+  relocate(PtRace, .after=PtSex) %>%
+  relocate(Age, .after=PtRace)
+
+sh_final <- sh_final %>%
+  mutate(death=ifelse(PtOutcomeID==1, 1, 0)) %>%
+  relocate(death, .after=Age)
+
+# check the category of Patient Outcome 
+#plot_bar(sh_final$PtOutcomeID)  #shows 7 categories
+                                #12: peritonitis, 1: death, 13: ESI, 
+                                #2: HD, 8: recover kidney function,                                 
+                                #6: lost to f/up, 3: transplanted 
+
+comp <- sh_final #prepare a new datasets for wrangling for cox
+
+#create a new variable "status" 
+comp['status']<- NA
+comp <- comp %>% 
+  relocate(status, .after= PtOutcomeID)
+
+comp$status[which(comp$PtOutcomeID==0)]  <-0
+comp$status[which(comp$PtOutcomeID==12)] <-1
+comp$status[which(comp$PtOutcomeID==2)]  <-2 #death & HD are denoted competing risks
+comp$status[which(is.na(comp$status2))]<-0 
+comp$status<-as.factor(comp$status2)
+
+
+comp <- comp %>% 
+  arrange(PatientID, PtDateOutcome) %>%
+  mutate(Index=row_number()) %>%
+  relocate(Index, .after=status) 
+
+#find out which subject has index==1 and outcome==0 -> need to remove specifically these rows
+comp2<-comp %>% 
+  filter(n()!=1)
+
+which(comp2$Index==1 & comp2$PtOutcomeID ==0)   #no subject had outcome==0 as first outcome event 
+                                                ## comp2 has no more value 
+
+comp <- comp %>% 
+  arrange(PatientID, PtDateOutcome)  %>%
+  filter(Index==1)
+
+##  | drop PtHeight and PtWeight (for now since too many missing data)
+comp <- subset(comp, select = -c(t.start2, NotifID, PtRRTID, SDPID, SDPID.x, PtARID, NotifID.x, PtRRTID.x, givendate.x,NotifID.y, PtRRTID.y, PtRenalSpecify, PtRenal2, PtRenalSpecify2, givendate.y, PtHeight, PtWeight, Modality))
+
+
+######
+######
+### fill in PtAssist arbitrily then verify later 
+######
+######
+comp$PtAssist[which(is.na(comp$PtAssist))]<-1
+comp$PtAssist[which(comp$PtAssist==9999)]<-1
+
+
+comp[is.na(comp)]<-0 #this step will cause many missing data in PtAssist to become "0"
+
+#convert day_diag and day_pd to months 
+comp['month_diag']<-comp$day_diag/30
+comp['month_pd']<- comp$day_pd/30
+
+######## Convert SDPID.y to Site (arranged by State) ######## 
+comp['site']<- NA
+comp$site[which(comp$SDPID.y==330)]<-2
+comp$site[which(comp$SDPID.y==430)]<-3
+comp$site[which(comp$SDPID.y==530 | comp$SDPID.y==630)]<-4
+comp$site[which(comp$SDPID.y==830 | comp$SDPID.y==831)]<-5
+comp$site[which(comp$SDPID.y==730 | comp$SDPID.y==4330 | comp$SDPID.y==108130)]<-6
+comp$site[which(comp$SDPID.y==930)]<-7
+comp$site[which(comp$SDPID.y==1030 | comp$SDPID.y==2330 | comp$SDPID.y==3030 | comp$SDPID.y==7731)]<-8
+comp$site[which(comp$SDPID.y==1330)]<-9
+comp$site[which(comp$SDPID.y==1230 | comp$SDPID.y==3130 | comp$SDPID.y==3730 | comp$SDPID.y==5030 | comp$SDPID.y==7130 | comp$SDPID.y==143730)]<-10
+comp$site[which(comp$SDPID.y==1130 | comp$SDPID.y==8530 | comp$SDPID.y==106530)]<-11
+comp$site[which(comp$SDPID.y==1430 | comp$SDPID.y==1530 | comp$SDPID.y==1630)]<-12
+comp$site[which(comp$SDPID.y==1730 | comp$SDPID.y==1930)]<-13
+comp$site[which(comp$SDPID.y==130)]<-14
+
+comp$site <- as.factor(comp$site)
+
+## combine the dataset with sh11_pdsys 
+comp <- merge(comp, sh11_pdsys, by="PatientID", all=TRUE)
+
+
+# create a new variable "dm" to denote primary renal disease of diabetes 
+comp <- comp %>%
+  mutate(dm=ifelse(PtRenal1==2, 1,0)) %>%
+  relocate(dm, .after=PtAssist)
+
+# create a new variable "Age2" to make it similar to Cox PH model 
+library(AMR) 
+comp <- comp %>%
+  mutate(Age2=Age)
+
+comp$Age2 <- age_groups(comp$Age, split_at=c(18,30,40,50,60,70,80,90))
+
+comp$Age2<-factor(comp$Age2, ordered = FALSE)
+  
+
+
+# create a new variable "m.time" to denote time in month 
+comp['m.time']<- comp$time/30
+
+comp = comp %>%
+  relocate(m.time, .after=time)
+
+## double check the data structure of the "comp" data frame 
+str(comp)   #status     : numeric 
+            #day_diag   : difftim 
+            #day_pd     : difftime 
+            #month_diag : difftime
+            #month_pd   : difftime
+            #event      : numeric 
+            #time       : difftime
+            #death      : numeric 
+            #PtAssist   : numeric 
+            #dm         : numeric 
+            #comob.hpt  : numeric 
+            #comob.dm   : numeric 
+            #brand      : numeric 
+            #Age_group  : numeric
+
+# Change variables back to factor 
+a <- c("status", "event", "death", "PtAssist", "dm", "comob.hpt", "comob.dm","brand", "Age2")
+comp[,a]<-lapply(comp[,a], factor)
+
+# change variable from difftime to numeric 
+b <- c("day_diag", "day_pd", "month_diag", "month_pd", "time", "m.time")
+comp[,b]<-sapply(comp[,b], as.numeric)
+
+
+```

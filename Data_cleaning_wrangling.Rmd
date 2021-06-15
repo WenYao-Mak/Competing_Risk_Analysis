@@ -891,6 +891,112 @@ comp[,b]<-sapply(comp[,b], as.numeric)
 
 ## check again the data structure of the "comp" data frame 
 str(comp)   #all OK
+
+### output the final dataset as .csv 
+library(data.table)
+fwrite(comp, "comp.csv") #fastest way to write a csv file 
+
 ```
 
 --- End of Data Wrangling --- 
+
+# Step 3: Data Visualisation 
+## Table 1: demographic information 
+```{r tab1,  eval=T, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE}
+library(table1)
+
+# Re-label the stratifying variables "status" 
+
+comp$status <- 
+  factor(comp$status, 
+         levels=c(0,1,2), 
+         labels=c("Censor", 
+                  "Peritonitis", 
+                  "Competing events"))
+
+# Create a basic demographic table 
+
+table1(~PtSex+PtRace+Age+Age2+PtAssist+dm+gl+uro+neph+hpt+AD+her.neph+brand+PDSystem+site+PDRegimen+month_diag+month_pd | status, data = comp)
+
+# Re-label all data points 
+comp$PtSex <- 
+  factor(comp$PtSex, levels=c(1,2),
+  labels=c("Male", "Female"))
+
+comp$PtRace <- 
+  factor(comp$PtRace, levels = c(1,2,3,5,6,19),
+         labels = c("Malay", "Chinese", "Indian", "Bumi Sabah", "Bumi Sarawak", "Other Msian"))
+
+comp$PtAssist <- 
+  factor(comp$PtAssist, levels = c(1,2,3), 
+         labels = c("No Help", "Partial", "Dependent"))
+
+comp$dm <- 
+  factor(comp$dm, levels = c(0,1), 
+         labels = c("No", "Yes"))
+
+comp$gl <- 
+  factor(comp$gl, levels = c(0,1), 
+         labels = c("No", "Yes"))
+
+comp$uro <- 
+  factor(comp$uro, levels = c(0,1), 
+         labels = c("No", "Yes"))
+
+comp$neph <- 
+  factor(comp$neph, levels = c(0,1), 
+         labels = c("No", "Yes"))
+
+comp$hpt <- 
+  factor(comp$hpt, levels = c(0,1), 
+         labels = c("No", "Yes"))
+
+comp$AD <- 
+  factor(comp$AD, levels = c(0,1), 
+         labels = c("No", "Yes"))
+
+comp$her.neph <- 
+  factor(comp$her.neph, levels = c(0,1), 
+         labels = c("No", "Yes"))
+
+comp$brand <- 
+  factor(comp$brand, levels = c(1,2,3), 
+         labels = c("Baxter", "Fresenius", "Lucenxia"))
+
+comp$site <- 
+  factor(comp$site, levels = c(2,3,4,5,6,7,8,9,10,11,12,13,14), 
+         labels = c("Kedah","Penang","Perak","N.Sembilan","Selangor","Melaka","Johor","Kelantan","Terengganu","Pahang","Sabah","Sarawak","KL"))
+
+comp$PDSystem <- 
+  factor(comp$PDSystem, levels = c(101,102,105,188,201,202,204,206,288,301), 
+         labels = c("Ultrabag", "Icodextrin", "HomeChoice/Pro","Baxter (unknown)", "Andy Disc", "Stay Safe", "Balance","Sleep Safe", "Fresenius (unknown)", "Intellis"))
+
+comp$PDRegimen <- 
+  factor(comp$PDRegimen, levels = c(1,2,3), 
+         labels = c("CAPD", "DAPD", "APD/CCPD/NIPD"))
+
+# Re-label column name 
+## Factor variable 
+label(comp$PtSex)           <- "Sex"
+label(comp$PtRace)          <- "Race"
+label(comp$PtAssist)        <- "PD Assistance"
+label(comp$dm)              <- "Diabetes"
+label(comp$gl)              <- "Glomerulonephritis"
+label(comp$uro)             <- "Obstructive uropathy"
+label(comp$neph)            <- "Drugs/toxic nephropathy"
+label(comp$hpt)             <- "Hypertension"
+label(comp$AD)              <- "ADPKD"
+label(comp$her.neph)        <- "Hereditary nephritis"
+label(comp$Age2)            <- "Age groups"
+label(comp$brand)           <- "PD Brand"
+label(comp$site)            <- "State"
+
+## Continuous variable with units 
+label(comp$Age)         <- "Age"
+label(comp$month_diag)  <- "Time since ESRF"
+label(comp$month_pd)    <- "Time since first PD"
+
+units(comp$Age)       <- "years"
+units(comp$month_diag) <- "months"
+units(comp$month_pd)   <- "months"
+```

@@ -903,7 +903,7 @@ comp = comp %>%
       ff_label("Primary Renal Disease"), 
     brand = factor(brand) %>%
       fct_recode("Baxter" = "1", 
-                 "FMC" = "2", 
+                 "Fresenius" = "2", 
                  "Lucenxia" = "3") %>%
       ff_label("PD brand"), 
     site = factor(site) %>%

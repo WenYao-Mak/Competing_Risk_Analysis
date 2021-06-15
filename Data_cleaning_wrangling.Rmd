@@ -22,6 +22,17 @@ mainfont: Arial
 classoption: a4paper
 ---
 
+Aim: 
+To produce a *tidy* dataset for subsequent competing risk analysis 
+
+Note: Tidy data is organised as: 
+* Each column is a single *variable* 
+* Each row is a single *observation* 
+* Ech cell is a single *value* 
+
+Reference: 
+https://bookdown.org/mikemahoney218/IDEAR/data-wrangling.html
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```

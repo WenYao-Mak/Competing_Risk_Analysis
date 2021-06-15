@@ -904,11 +904,14 @@ fwrite(comp, "comp.csv") #fastest way to write a csv file
 ## Table 1: demographic information 
 ```{r tab1,  eval=T, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE}
 library(table1)
+# comp2 is only for the baseline demographic table 
+comp2 <- comp
+
 
 # Re-label the stratifying variables "status" 
 
-comp$status <- 
-  factor(comp$status, 
+comp2$status <- 
+  factor(comp2$status, 
          levels=c(0,1,2), 
          labels=c("Censor", 
                   "Peritonitis", 
@@ -916,79 +919,79 @@ comp$status <-
 
 
 # Re-label all data points 
-comp$PtSex <- 
-  factor(comp$PtSex, levels=c(1,2),
+comp2$PtSex <- 
+  factor(comp2$PtSex, levels=c(1,2),
   labels=c("Male", "Female"))
-comp$PtRace <- 
-  factor(comp$PtRace, levels = c(1,2,3,5,6,19),
+comp2$PtRace <- 
+  factor(comp2$PtRace, levels = c(1,2,3,5,6,19),
          labels = c("Malay", "Chinese", "Indian", "Bumi Sabah", "Bumi Sarawak", "Other Msian"))
-comp$PtAssist <- 
-  factor(comp$PtAssist, levels = c(1,2,3), 
+comp2$PtAssist <- 
+  factor(comp2$PtAssist, levels = c(1,2,3), 
          labels = c("No Help", "Partial", "Dependent"))
-comp$dm <- 
-  factor(comp$dm, levels = c(0,1), 
+comp2$dm <- 
+  factor(comp2$dm, levels = c(0,1), 
          labels = c("No", "Yes"))
-comp$gl <- 
-  factor(comp$gl, levels = c(0,1), 
+comp2$gl <- 
+  factor(comp2$gl, levels = c(0,1), 
          labels = c("No", "Yes"))
-comp$uro <- 
-  factor(comp$uro, levels = c(0,1), 
+comp2$uro <- 
+  factor(comp2$uro, levels = c(0,1), 
          labels = c("No", "Yes"))
-comp$neph <- 
-  factor(comp$neph, levels = c(0,1), 
+comp2$neph <- 
+  factor(comp2$neph, levels = c(0,1), 
          labels = c("No", "Yes"))
-comp$hpt <- 
-  factor(comp$hpt, levels = c(0,1), 
+comp2$hpt <- 
+  factor(comp2$hpt, levels = c(0,1), 
          labels = c("No", "Yes"))
-comp$AD <- 
-  factor(comp$AD, levels = c(0,1), 
+comp2$AD <- 
+  factor(comp2$AD, levels = c(0,1), 
          labels = c("No", "Yes"))
-comp$her.neph <- 
-  factor(comp$her.neph, levels = c(0,1), 
+comp2$her.neph <- 
+  factor(comp2$her.neph, levels = c(0,1), 
          labels = c("No", "Yes"))
-comp$brand <- 
-  factor(comp$brand, levels = c(1,2,3), 
+comp2$brand <- 
+  factor(comp2$brand, levels = c(1,2,3), 
          labels = c("Baxter", "Fresenius", "Lucenxia"))
-comp$site <- 
-  factor(comp$site, levels = c(2,3,4,5,6,7,8,9,10,11,12,13,14), 
+comp2$site <- 
+  factor(comp2$site, levels = c(2,3,4,5,6,7,8,9,10,11,12,13,14), 
          labels = c("Kedah","Penang","Perak","N.Sembilan","Selangor","Melaka","Johor","Kelantan","Terengganu","Pahang","Sabah","Sarawak","KL"))
 
-comp$PDSystem <- 
-  factor(comp$PDSystem, levels = c(101,102,105,188,201,202,204,206,288,301), 
+comp2$PDSystem <- 
+  factor(comp2$PDSystem, levels = c(101,102,105,188,201,202,204,206,288,301), 
          labels = c("Ultrabag", "Icodextrin", "HomeChoice/Pro","Baxter (unknown)", "Andy Disc", "Stay Safe", "Balance","Sleep Safe", "Fresenius (unknown)", "Intellis"))
 
-comp$PDRegimen <- 
-  factor(comp$PDRegimen, levels = c(1,2,3), 
+comp2$PDRegimen <- 
+  factor(comp2$PDRegimen, levels = c(1,2,3), 
          labels = c("CAPD", "DAPD", "APD/CCPD/NIPD"))
 
 # Re-label column name 
 ## Factor variable 
-label(comp$PtSex)           <- "Sex"
-label(comp$PtRace)          <- "Race"
-label(comp$PtAssist)        <- "PD Assistance"
-label(comp$dm)              <- "Diabetes"
-label(comp$gl)              <- "Glomerulonephritis"
-label(comp$uro)             <- "Obstructive uropathy"   #no subject has this issue 
-label(comp$neph)            <- "Drugs/toxic nephropathy"
-label(comp$hpt)             <- "Hypertension"
-label(comp$AD)              <- "ADPKD"
-label(comp$her.neph)        <- "Hereditary nephritis"
-label(comp$Age2)            <- "Age groups"
-label(comp$brand)           <- "PD Brand"
-label(comp$site)            <- "State"
+label(comp2$PtSex)           <- "Sex"
+label(comp2$PtRace)          <- "Race"
+label(comp2$PtAssist)        <- "PD Assistance"
+label(comp2$dm)              <- "Diabetes"
+label(comp2$gl)              <- "Glomerulonephritis"
+label(comp2$uro)             <- "Obstructive uropathy"   #no subject has this issue 
+label(comp2$neph)            <- "Drugs/toxic nephropathy"
+label(comp2$hpt)             <- "Hypertension"
+label(comp2$AD)              <- "ADPKD"
+label(comp2$her.neph)        <- "Hereditary nephritis"
+label(comp2$Age2)            <- "Age groups"
+label(comp2$brand)           <- "PD Brand"
+label(comp2$site)            <- "State"
 
 ## Continuous variable with units 
-label(comp$Age)         <- "Age"
-label(comp$month_diag)  <- "Time since ESRF"
-label(comp$month_pd)    <- "Time since first PD"
+label(comp2$Age)         <- "Age"
+label(comp2$month_diag)  <- "Time since ESRF"
+label(comp2$month_pd)    <- "Time since first PD"
 
-units(comp$Age)       <- "years"
-units(comp$month_diag) <- "months"
-units(comp$month_pd)   <- "months"
+units(comp2$Age)       <- "years"
+units(comp2$month_diag) <- "months"
+units(comp2$month_pd)   <- "months"
 
 # Create a basic demographic table 
 
-table1(~PtSex+PtRace+Age+Age2+PtAssist+dm+gl+uro+neph+hpt+AD+her.neph+brand+PDSystem+site+PDRegimen+month_diag+month_pd | status, data = comp)
+tab1 <- table1(~PtSex+PtRace+Age+Age2+PtAssist+dm+gl+uro+neph+hpt+AD+her.neph+brand+PDSystem+site+PDRegimen+month_diag+month_pd | status, data = comp2)
 
 
 # create higher level grouping 
@@ -1012,10 +1015,10 @@ labels <- list(
                  month_pd="Time since first PD (month"),
   groups=list("", "", "Outcomes"))
 
-levels(comp$status) <- c("No Outcome", "Peritonitis", "Competing events")
+levels(comp2$status) <- c("No Outcome", "Peritonitis", "Competing events")
 
 # Set up a "strata" 
-strata <- c(list(Total=comp, split(comp, comp$status)))
+strata <- c(list(Total=comp2, split(comp2, comp2$status)))
 
 #Custom renderers
 my.render.cont <- function(x) {
@@ -1030,10 +1033,5 @@ my.render.cat <- function(x) {
 #this code is not working 
 #table1(strata, labels, groupspan=c(1,1,2),
 #	render.continuous=my.render.cont, render.categorical=my.render.cat)
-
-
-### output the final dataset as .csv 
-library(data.table)
-fwrite(comp, "comp.csv") #fastest way to write a csv file 
 
 ```

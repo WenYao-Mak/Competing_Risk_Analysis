@@ -914,55 +914,41 @@ comp$status <-
                   "Peritonitis", 
                   "Competing events"))
 
-# Create a basic demographic table 
-
-table1(~PtSex+PtRace+Age+Age2+PtAssist+dm+gl+uro+neph+hpt+AD+her.neph+brand+PDSystem+site+PDRegimen+month_diag+month_pd | status, data = comp)
 
 # Re-label all data points 
 comp$PtSex <- 
   factor(comp$PtSex, levels=c(1,2),
   labels=c("Male", "Female"))
-
 comp$PtRace <- 
   factor(comp$PtRace, levels = c(1,2,3,5,6,19),
          labels = c("Malay", "Chinese", "Indian", "Bumi Sabah", "Bumi Sarawak", "Other Msian"))
-
 comp$PtAssist <- 
   factor(comp$PtAssist, levels = c(1,2,3), 
          labels = c("No Help", "Partial", "Dependent"))
-
 comp$dm <- 
   factor(comp$dm, levels = c(0,1), 
          labels = c("No", "Yes"))
-
 comp$gl <- 
   factor(comp$gl, levels = c(0,1), 
          labels = c("No", "Yes"))
-
 comp$uro <- 
   factor(comp$uro, levels = c(0,1), 
          labels = c("No", "Yes"))
-
 comp$neph <- 
   factor(comp$neph, levels = c(0,1), 
          labels = c("No", "Yes"))
-
 comp$hpt <- 
   factor(comp$hpt, levels = c(0,1), 
          labels = c("No", "Yes"))
-
 comp$AD <- 
   factor(comp$AD, levels = c(0,1), 
          labels = c("No", "Yes"))
-
 comp$her.neph <- 
   factor(comp$her.neph, levels = c(0,1), 
          labels = c("No", "Yes"))
-
 comp$brand <- 
   factor(comp$brand, levels = c(1,2,3), 
          labels = c("Baxter", "Fresenius", "Lucenxia"))
-
 comp$site <- 
   factor(comp$site, levels = c(2,3,4,5,6,7,8,9,10,11,12,13,14), 
          labels = c("Kedah","Penang","Perak","N.Sembilan","Selangor","Melaka","Johor","Kelantan","Terengganu","Pahang","Sabah","Sarawak","KL"))
@@ -999,4 +985,52 @@ label(comp$month_pd)    <- "Time since first PD"
 units(comp$Age)       <- "years"
 units(comp$month_diag) <- "months"
 units(comp$month_pd)   <- "months"
+
+# Create a basic demographic table 
+
+table1(~PtSex+PtRace+Age+Age2+PtAssist+dm+gl+uro+neph+hpt+AD+her.neph+brand+PDSystem+site+PDRegimen+month_diag+month_pd | status, data = comp)
+
+
+# create higher level grouping 
+## the labels will be set up differently
+labels <- list(
+  variables=list(PtSex="Sex",
+                 PtRace="Race",
+                 PtAssist="PD Assistance",
+                 dm="Diabetes",
+                 gl="Glomerulonephritis",
+                 uro="Obstructive uropathy",
+                 neph="Drugs/toxic nephropathy",
+                 hpt="Hypertension",
+                 AD="ADPKD",
+                 her.neph="Hereditary nephritis",
+                 age="Age (Years)",
+                 Age2="Age groups",
+                 brand="PD Brand",
+                 site="State",
+                 months_diag="Time since ESRF (month)",
+                 month_pd="Time since first PD (month"),
+  groups=list("", "", "Outcomes"))
+
+levels(comp$status) <- c("No Outcome", "Peritonitis", "Competing events")
+
+# Set up a "strata" 
+strata <- c(list(Total=comp, split(comp, comp$status)))
+
+#Custom renderers
+my.render.cont <- function(x) {
+    with(stats.apply.rounding(stats.default(x), digits=2), c("",
+        "Mean (SD)"=sprintf("%s (&plusmn; %s)", MEAN, SD)))
+}
+my.render.cat <- function(x) {
+    c("", sapply(stats.default(x), function(y) with(y,
+        sprintf("%d (%0.0f %%)", FREQ, PCT))))
+}
+
+#this code is not working 
+#table1(strata, labels, groupspan=c(1,1,2),
+#	render.continuous=my.render.cont, render.categorical=my.render.cat)
+
+
+
 ```

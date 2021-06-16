@@ -30,33 +30,26 @@ bibliography: nccr.bib
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-```{r cleaning,eval=T,echo=F, cache=T, results=F, warning=F, message=F}
+```{r cleaning,eval=T,echo=F, cache=F, results=F, warning=F, message=F}
 library(tidyverse)
-############################################
-### Read in raw data provided by the NRR ###
-############################################
+# | Phase 1 competing risk 
+sh1_patient <- read_csv("Sh1_Patient.csv")
+sh3_AR <- read_csv("Sh2_PtAnnualAR.csv")
+sh4_notif <- read_csv("Sh4_PtNotif.csv")
+sh5_comorb <- read_csv("Sh5_PtNotifComorb.csv")
+sh6_lab <- read_csv("Sh6_PtNotifLab.csv")
+sh7_outcome <- read_csv("Sh7_PtNotifOutcome.csv")
+sh8_peri <- read_csv("Sh8_PtNotifPDPeri.csv")
 
-sh1_patient     <- read_csv("Sh1_Patient.csv")
-sh3_AR          <- read_csv("Sh2_PtAnnualAR.csv")
-sh4_notif       <- read_csv("Sh4_PtNotif.csv")
-sh5_comorb      <- read_csv("Sh5_PtNotifComorb.csv")
-sh6_lab         <- read_csv("Sh6_PtNotifLab.csv")
-sh7_outcome     <- read_csv("Sh7_PtNotifOutcome.csv")
-sh8_peri        <- read_csv("Sh8_PtNotifPDPeri.csv")
-sh9_periAB      <- read_csv("Sh9_PtNotifPDPeriAB.csv")
+sh9_periAB <- read_csv("Sh9_PtNotifPDPeriAB.csv")
 sh10_pdperiperf <- read_csv("Sh10_PtNotifPDPeriPerf.csv")
-sh11_pdsys      <- read_csv("Sh11_PtNotifPDSystem.csv")
-sh12_sero       <- read_csv("Sh12_PtNotifSerology.csv")
-sh13_sdp        <- read_csv("Sh13_SDP.csv")
+sh11_pdsys <- read_csv("Sh11_PtNotifPDSystem.csv")
+sh12_sero <- read_csv("Sh12_PtNotifSerology.csv")
+sh13_sdp <- read_csv("Sh13_SDP.csv")
 
 ```
 
-```{r sh1,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
-
-#########################################
-### Data sheet 1: Patient Information ###
-#########################################
-
+```{r sh1,eval=T,echo=F, cache=F, results=F, warning=F, message=F}
 #Step 1: clarify the data structure 
 str(sh1_patient) #Date format ok, others should be factor 
 
@@ -71,16 +64,15 @@ which(is.na(sh1_patient)) #no missing data
 
 #Step 4: Explore & enrich the data 
 
-### 4.1: Basic demographics 
+### 4.1: histogram for Race, and Blood-group 
 library(DataExplorer)
-plot_bar(sh1_patient$PtSex)         #Male=1, Female=2
-plot_bar(sh1_patient$PtCitizenship) #Malaysian=1
-plot_bar(sh1_patient$PtRace)        #Malay=1, Chi=2, Ind=3, BumiSabah=4
+#plot_bar(sh1_patient$PtSex)         #Male=1, Female=2
+#plot_bar(sh1_patient$PtCitizenship) #Malaysian=1
+#plot_bar(sh1_patient$PtRace)        #Malay=1, Chi=2, Ind=3, BumiSabah=4
                                     #BumiSarawak=5, OrgAsliSemj=7, OtherMsian=19, 
                                     #Foreigner=20
-plot_bar(sh1_patient$PtABO)         #A=1, B=2, AB=3, O=4, NA=8888, missing=9999
-                                    #note: some patients blood-group (PtABO) is "not available"; 
-                                      #variable will not be used.
+#plot_bar(sh1_patient$PtABO)         #A=1, B=2, AB=3, O=4, NA=8888, missing=9999
+#note: some patients blood-group (PtABO) is "not available"; variable will not be used.
 
 ### 4.2: convert dob to age ###
 sh1_patient['Age']<-NA #create a new variable called "Age"
@@ -89,8 +81,8 @@ sh1_patient['givendate']<-as.Date("31-12-2018", format="%d-%m-%Y")
 library(lubridate) #use the lubridate package for dates 
 sh1_patient$Age<- interval(start=sh1_patient$PtDateBirth, end=sh1_patient$givendate)/duration(num = 1, units = "years") 
 
-ggplot(sh1_patient, aes(x=Age)) + 
-  geom_histogram()                  #histogram shows negative age 
+#ggplot(sh1_patient, aes(x=Age)) + 
+#  geom_histogram()                  #histogram shows negative age 
 
 #   |to identify which patients had negative age 
 subset(sh1_patient, sh1_patient$givendate < sh1_patient$PtDateBirth) #70695,71570
@@ -100,16 +92,12 @@ sh1_patient$PtDateBirth[which(sh1_patient$PatientID==71570)]<- as.Date("1929-09-
 #   |re-run age calculation 
 sh1_patient$Age<- interval(start=sh1_patient$PtDateBirth, end=sh1_patient$givendate)/duration(num = 1, units = "years") 
 
-ggplot(sh1_patient, aes(x=Age)) + 
-  geom_histogram()                  #skewness to the left 
+#ggplot(sh1_patient, aes(x=Age)) + 
+#  geom_histogram()                  #skewness to the left 
 
 ```
 
-```{r sh3,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
-
-###########################################
-### Data sheet 3: Patient Annual Return ###
-###########################################
+```{r sh3,eval=T,echo=F, cache=F, results=F, warning=F, message=F}
 
 #Step 1: clarify the data structure 
 str(sh3_AR) #PtARID, PatientID, NotifID, SDPID, PtAssist should be factor 
@@ -129,7 +117,7 @@ sh3_AR<-arrange(sh3_AR,PatientID, DataYear) #some patients did not return the fo
 
 ## 4.2: identify which PtAssist changed / deteriorates 
 #plot_bar(sh3_AR$PtAssist)
-which(sh3_AR$PtAssist==8888) #26 rows has NA for PtAssist for some years 
+which(sh3_AR$PtAssist==8888) #26 rows has NA for PtAssist 
 sh3_AR$PtAssist[which(sh3_AR$PtAssist==8888)]<-NA
 which(is.na(sh3_AR$PtAssist)) #all 26 rows converted to NA
 
@@ -148,7 +136,7 @@ sh3_AR<-sh3_AR %>%
 sh3_AR$deteriorate[which(is.na(sh3_AR$deteriorate))]<-0
 
 
-## Create a new sub-data that contains latest DataYear (variable currently not used in analysis)
+## Create a new sub-data that contains latest DataYear
 ## Will sacrifice some details in PtAssist over time 
 sh3_AR<-arrange(sh3_AR, PatientID, desc(DataYear))
 
@@ -157,13 +145,12 @@ setDT(sh3_AR)
 sh3_AR2<-sh3_AR[rowid(rleid(PatientID)) == 1]
 sh3_AR2<-subset(sh3_AR2, select =  -c(8:9))
 
+which(sh3_AR2$PtAssist==9999) #only one has missing data
+sh3_AR2$PtAssist[which(sh3_AR2$PtAssist==9999)]<-1
+
 ``` 
 
-```{r sh4,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
-
-##########################################
-### Data sheet 4: Patient Notification ###
-##########################################
+```{r sh4,eval=T,echo=F, cache=F, results=F, warning=F, message=F}
 
 #Step 1: clarify the data structure 
 str(sh4_notif)    #A few issues: 
@@ -228,7 +215,7 @@ sh4_notif$ESRFDateFirstRx<-as.Date(sh4_notif$ESRFDateFirstRx)
 #sh4_notif[na_bool,]$ESRFDateFirstRx=sh4_notif[c(FALSE, na_bool[-length(na_bool)]),]$ESRFDateFirstRx #shift the value up if ESRFDateFirstRx is NA
 
 ## 2.2: PtRenal1 
-plot_bar(sh4_notif$PtRenal1) #quite some patient w/out valid reasons 
+#plot_bar(sh4_notif$PtRenal1) #quite some patient w/out valid reasons 
 
 #Step 3: identify ANY missing data 
 which(is.na(sh4_notif[,8])) #index 668 & 1217 have real missing data; 
@@ -256,12 +243,7 @@ sh4_notif<-sh4_notif[rowid(rleid(PatientID)) == 1] #final dataset has 1149 obs
 
 ``` 
 
-```{r sh5,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
-
-###########################################
-### Data sheet 5: Patient Comorbidities ###
-###########################################
-
+```{r sh5,eval=T,echo=F, cache=F, results=F, warning=F, message=F}
 
 #Step 1: clarify the data structure 
 str(sh5_comorb) #Issues identified 
@@ -282,6 +264,7 @@ which(duplicated(sh5_comorb$PatientID)) #PatientID repeated for multiple comorbi
 which(is.na(sh5_comorb[,1:8])) #no missing data
 
 #Step 4: Explore & enrich the data 
+
 ## 4.1: convert the column "Comorbidity" from long to wide
 ## | use the newer pivot_wider() from tidyverse/tidyr to make the conversion 
 ## | add a new column to indicate comorb is "present" 
@@ -382,11 +365,7 @@ sh5_comorb$PatientID<-as.numeric(sh5_comorb$PatientID)
 
 ``` 
 
-```{r sh7,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
-
-#################################################################
-### Data sheet 7: Patient Outcome (except peritonitis or ESI) ###
-#################################################################
+```{r sh7,eval=T,echo=F, cache=F, results=F, warning=F, message=F}
 
 #Step 1: clarify the data structure 
 str(sh7_outcome)  #Similar issues as previous sheets 
@@ -427,17 +406,13 @@ sh7_outcome<-subset(sh7_outcome, select =  -c(5))
 
 ## 4.3: drop the row with PtOutcomeID == 5 (move to other centre)
 sh7_outcome<-subset(sh7_outcome, !(PtOutcomeID==5 | PtOutcomeID==0))
-plot_bar(sh7_outcome$PtOutcomeID)
+#plot_bar(sh7_outcome$PtOutcomeID)
 
 ## 4.3: shorten the column 
 sh7_outcome<-subset(sh7_outcome, select = c(1:9))
 ``` 
 
-```{r sh8,eval=T,echo=T, cache=T, results=T, warning=F, message=F}
-
-##############################################################
-### Data sheet 8: Patient outcome (only peritontis or ESI) ###
-##############################################################
+```{r sh8,eval=T,echo=F, cache=F, results=F, warning=F, message=F}
 
 #Step 1: clarify the data structure 
 str(sh8_peri)     #A few issues
@@ -562,23 +537,17 @@ which(sh8_peri$PatientID==76394 & sh8_peri$PtNotifPDPeriID==15337)
 
 #index 394,531,532,533,534,535,536,537,538,673,992,993,1016
 sh8_peri <- sh8_peri[-c(394,531,532,533,534,535,536,537,538,673,992,993,1016),]
-
-# Current analysis only look at peritonitis, so will remove all cases of ESI
-sh8_peri <- subset(sh8_peri, sh8_peri$PeritonitisType==2 )
-
+    
 ``` 
 
-```{r sh7_8, eval=T, echo=F, cache=T, results=FALSE, warning=FALSE, message=FALSE} 
-
-###############################################################################
-### Data sheet 7 and 8: combined both sets into a single outcome data frame ###
-###############################################################################
+```{r sh7_8, eval=T, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE} 
 
 # combine both sh7 and sh8 into one outcome dataset 
 
 ## Step 1: change the PeritonitisType to PtOutcomeID, and DatePeri to PtDateOutcome 
 ##  | Peritonitis from 2-> 12; ESI from 1-> 13 
 sh8_peri$PeritonitisType[sh8_peri$PeritonitisType==2]<- 12
+sh8_peri$PeritonitisType[sh8_peri$PeritonitisType==1]<- 13
 
 ##  | Rename column 
 sh8_peri<- rename(sh8_peri, PtOutcomeID=PeritonitisType)
@@ -606,11 +575,7 @@ sh7_8 <- subset(sh7_8,select =  c(2:8))
 
 ```
 
-```{r sh_demo, eval=T, echo=F, cache=T, results=FALSE, warning=FALSE, message=FALSE}
-
-#############################################
-### Combine all dataset into a single set ###
-#############################################
+```{r sh_demo, eval=T, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE}
 
 # combine sh1, sh3, sh4, and sh5 to form a combined demographic dataset 
 
@@ -624,11 +589,10 @@ sh_demo.fin<-arrange(sh_demo.fin, PatientID) #1149 obs
 
 ```
 
-```{r sh_11, eval=T, echo=F, cache=T, results=FALSE, warning=FALSE, message=FALSE}
+```{r sh_11, eval=T, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE}
 
-########################################
-### Data sheet 11: Patient PD system ###
-########################################
+sh11_pdsys <- read_csv("Sh11_PtNotifPDSystem.csv")
+
 
 #Step 1: clarify the data structure 
 str(sh11_pdsys) #PDRegimen and PDSystem were both numeric variables 
@@ -651,14 +615,13 @@ sh11_pdsys <- sh11_pdsys %>%
 
 which(is.na(sh11_pdsys$PDRegimen)&sh11_pdsys$Index==1) #1 (ID:1253), 79 (ID: 25299), 1601 (ID:70770), 1754 (ID: 71009)
 
-#verify source
+#change PDRegimen into a factor variable 
+sh11_pdsys$PDRegimen<- as.factor(sh11_pdsys$PDRegimen)
+
 sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==1253&sh11_pdsys$Index==1)]<-3
 sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==70770&sh11_pdsys$Index==1)]<-1
 sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==71009&sh11_pdsys$Index==1)]<-1
 sh11_pdsys$PDRegimen[which(sh11_pdsys$PatientID==25299&sh11_pdsys$Index==1)]<-1
-
-#change PDRegimen into a factor variable 
-sh11_pdsys$PDRegimen<- as.factor(sh11_pdsys$PDRegimen)
 
 #set PDSystem ==8888 or 9999 to NA 
 sh11_pdsys$PDSystem[which(sh11_pdsys$PDSystem==8888 | sh11_pdsys$PDSystem==9999)]<-NA
@@ -667,13 +630,12 @@ sh11_pdsys<- relocate(sh11_pdsys, PDSystem, .after = Index)
 
 which(is.na(sh11_pdsys$PDSystem)&sh11_pdsys$Index==1) #1 (ID:1253), 79 (ID: 25299), 1601 (ID:70770), 1754 (ID: 71009)
 
-#verify source 
 sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==1253&sh11_pdsys$Index==1)]<-101
 sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==70770&sh11_pdsys$Index==1)]<-101
 sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==71009&sh11_pdsys$Index==1)]<-101
 sh11_pdsys$PDSystem[which(sh11_pdsys$PatientID==25299&sh11_pdsys$Index==1)]<-101
 
-## Keep only the first row (the baseline PD system)
+## Keep only the first row 
 sh11_pdsys <- sh11_pdsys %>%
   arrange(PatientID, Index) %>%
   filter(Index==1)
@@ -694,12 +656,8 @@ sh11_pdsys$brand[which(sh11_pdsys$PDSystem==301|sh11_pdsys$PDSystem==388|sh11_pd
 sh11_pdsys$brand[which(is.na(sh11_pdsys$brand))]<-9
 ```
 
-```{r wrangle_cmprsk_peri, eval=T, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE}
-
-#######################################################
-### To create a dataset for competing risk analysis ###
-#######################################################
-
+```{r wrangle_cox, eval=F, echo=F, cache=F, results=F, warning=F, message=F} 
+# need to redo the steps in all_data EXCEPT dropping patients with PtOutcomeID==0
 sh_final<-merge(sh7_8, sh_demo.fin, by="PatientID", all = TRUE)
 
 sh_final<-arrange(sh_final, PatientID, PtDateOutcome)
@@ -757,24 +715,445 @@ sh_final <- sh_final %>%
   relocate(death, .after=Age)
 
 # check the category of Patient Outcome 
-plot_bar(sh_final$PtOutcomeID)  #shows 7 categories
-                                #12: peritonitis, 1: death
+#plot_bar(sh_final$PtOutcomeID)  #shows 7 categories
+                                #12: peritonitis, 1: death, 13: ESI, 
                                 #2: HD, 8: recover kidney function,                                 
                                 #6: lost to f/up, 3: transplanted 
 
-comp <- sh_final #prepare a new datasets for subsequent data wrangling 
+sh_cox <- sh_final #prepare a new datasets for wrangling for cox
+
+# For patients who experience other outcomes before death, the outcomes should be remove (leaving death as the only outcome)
+## Plan: rearrange row by PtDateOutcome and remove the remaining rows
+## Rationale: if other outcomes (HD, death, transplanted, lost to f/up, recover kidney function) occurs before peritonitis, these will "hide" the subsequent risks - competing risk analysis
+# For patients who had no competing outcomes, death will be terminal outcome, others will be censored
+
+sh_cox <- sh_cox %>% 
+  arrange(PatientID, PtDateOutcome)  %>%
+  filter(Index==1)
+
+## | use the newer pivot_wider() from tidyverse/tidyr to make the conversion 
+## | add a new column to indicate primary renal disease is "present" 
+sh_cox['prim.dis']<-as.integer(1)
+class(sh_cox$prim.dis)
+
+sh_cox <- sh_cox %>%
+  pivot_wider(
+    names_from = PtRenal1, 
+    values_from = prim.dis
+  )
+
+##  | rename the new columns 
+names(sh_cox)[63:73] <- c("toxic.nephropthy", "hpt","glomerulonephritis", "dm", "unknown", "obs.uropathy", "nil", "miss","others","hereditory.nephritis", "ADPKD")
+
+##  | drop column nil and miss 
+sh_cox<- sh_cox[,-(69:71)]
+
+##  | drop PtHeight and PtWeight (for now since too many missing data)
+sh_cox <- subset(sh_cox, select = -c(t.start2, NotifID, PtRRTID, SDPID, SDPID.x, PtARID, NotifID.x, PtRRTID.x, givendate.x,NotifID.y, PtRRTID.y, PtRenalSpecify, PtRenal2, PtRenalSpecify2, givendate.y, PtHeight, PtWeight, Modality))
+
+sh_cox[is.na(sh_cox)]<-0
+
+sh_cox<- merge(sh_cox, sh11_pdsys, by="PatientID", all = TRUE)
+
+#convert day_diag and day_pd to months 
+sh_cox['month_diag']<-sh_cox$day_diag/30
+sh_cox['month_pd']<- sh_cox$day_pd/30
+
+######## Convert SDPID.y to Site (arranged by State) ######## 
+sh_cox['site']<- NA
+sh_cox$site[which(sh_cox$SDPID.y==330)]<-2
+sh_cox$site[which(sh_cox$SDPID.y==430)]<-3
+sh_cox$site[which(sh_cox$SDPID.y==530 | sh_cox$SDPID.y==630)]<-4
+sh_cox$site[which(sh_cox$SDPID.y==830 | sh_cox$SDPID.y==831)]<-5
+sh_cox$site[which(sh_cox$SDPID.y==730 | sh_cox$SDPID.y==4330 | sh_cox$SDPID.y==108130)]<-6
+sh_cox$site[which(sh_cox$SDPID.y==930)]<-7
+sh_cox$site[which(sh_cox$SDPID.y==1030 | sh_cox$SDPID.y==2330 | sh_cox$SDPID.y==3030 | sh_cox$SDPID.y==7731)]<-8
+sh_cox$site[which(sh_cox$SDPID.y==1330)]<-9
+sh_cox$site[which(sh_cox$SDPID.y==1230 | sh_cox$SDPID.y==3130 | sh_cox$SDPID.y==3730 | sh_cox$SDPID.y==5030 | sh_cox$SDPID.y==7130 | sh_cox$SDPID.y==143730)]<-10
+sh_cox$site[which(sh_cox$SDPID.y==1130 | sh_cox$SDPID.y==8530 | sh_cox$SDPID.y==106530)]<-11
+sh_cox$site[which(sh_cox$SDPID.y==1430 | sh_cox$SDPID.y==1530 | sh_cox$SDPID.y==1630)]<-12
+sh_cox$site[which(sh_cox$SDPID.y==1730 | sh_cox$SDPID.y==1930)]<-13
+sh_cox$site[which(sh_cox$SDPID.y==130)]<-14
+
+sh_cox$site <- as.factor(sh_cox$site)
+
+```
+
+```{r KM, eval=F, echo=F, cache=F, results=F, warning=F, message=F}
+
+library(survival)
+library(survminer)
+library(dplyr)
+
+######################################
+### Customise label for ggsurvplot ###
+######################################
+
+#Helper function to customize plot labels:
+
+customize_labels <- function (p, font.title = NULL,
+                              font.subtitle = NULL, font.caption = NULL,
+                              font.x = NULL, font.y = NULL, font.xtickslab = NULL, font.ytickslab = NULL)
+{
+  original.p <- p
+  if(is.ggplot(original.p)) list.plots <- list(original.p)
+  else if(is.list(original.p)) list.plots <- original.p
+  else stop("Can't handle an object of class ", class (original.p))
+  .set_font <- function(font){
+    font <- ggpubr:::.parse_font(font)
+    ggtext::element_markdown (size = font$size, face = font$face, colour = font$color)
+  }
+  for(i in 1:length(list.plots)){
+    p <- list.plots[[i]]
+    if(is.ggplot(p)){
+      if (!is.null(font.title)) p <- p + theme(plot.title = .set_font(font.title))
+      if (!is.null(font.subtitle)) p <- p + theme(plot.subtitle = .set_font(font.subtitle))
+      if (!is.null(font.caption)) p <- p + theme(plot.caption = .set_font(font.caption))
+      if (!is.null(font.x)) p <- p + theme(axis.title.x = .set_font(font.x))
+      if (!is.null(font.y)) p <- p + theme(axis.title.y = .set_font(font.y))
+      if (!is.null(font.xtickslab)) p <- p + theme(axis.text.x = .set_font(font.xtickslab))
+      if (!is.null(font.ytickslab)) p <- p + theme(axis.text.y = .set_font(font.ytickslab))
+      list.plots[[i]] <- p
+    }
+  }
+  if(is.ggplot(original.p)) list.plots[[1]]
+  else list.plots
+}
+
+################### End of Helper Function #########################
+
+#data: peri.final 
+kaplan <- sh_cox
+kaplan['m.time']<- kaplan$time/30
+
+kaplan <- kaplan%>%
+  relocate(m.time, .after=time)
+
+## Model 1: Null model, no covariate
+fit.kaplan <- survfit(Surv(m.time,event)~1, data = kaplan) 
+#SDPID has a lot of missing data, SDPID.x/SDPID.y has no missing data
+
+KM1<- ggsurvplot(fit.kaplan, 
+           pval = TRUE, conf.int = TRUE, xlab = "Time (month)",
+           risk.table = TRUE, #add risk table 
+           break.time.by = 12, #break the time on risk table by 12 months
+           risk.table.col = "strata", #change risk table colour by groups
+           linetype = "strata", #change line type by groups
+           surv.median.line = "hv", #specify median survival 
+           ggtheme = theme_bw())
+
+# Model 2: Sex 
+fit.kaplan.sex <- survfit(Surv(m.time,event)~ PtSex, data = kaplan) 
+
+KM_sex <- ggsurvplot(fit.kaplan.sex, 
+           size=1, #change line size
+           legend.title = "Peritonitis-free interval by sex", legend.labs = c("Male","Female"), 
+           pval = TRUE, conf.int = TRUE, xlab = "Time (month)",
+           surv.plot.heigh =1,
+           risk.table = TRUE, #add risk table 
+           break.time.by = 12, #break the time on risk table by 12 months
+           risk.table.col = "strata", #change risk table colour by groups
+           risk.table.title="Number at risk of peritonitis", #change the risk table title 
+           linetype = "strata", #change line type by groups
+           surv.median.line = "hv", #specify median survival 
+           ncensor.plot = TRUE, #show the number of censored patients 
+           ggtheme = theme_bw())
+
+#Customise the labels and font size 
+KM_sex <- customize_labels(
+  KM_sex,
+  font.title    = c(8, "bold", "darkblue"),         
+  font.subtitle = c(8, "bold.italic", "purple"), 
+  font.caption  = c(8, "plain", "orange"),        
+  font.x        = c(8, "bold.italic", "red"),          
+  font.y        = c(8, "bold.italic", "darkred"),      
+  font.xtickslab = c(8, "plain", "darkgreen")
+)
+
+# Model 3: Race 
+fit.kaplan.race <- survfit(Surv(m.time,event)~ PtRace, data = kaplan) 
+
+KM_race <- ggsurvplot(fit.kaplan.race, 
+           size=1, #change line size
+           legend.title = "Peritonitis-free interval by race", legend.labs = c("Malay","Chinese", "Indian", "Bumi.Sbh", "Bumi.Swk","Oth.Msian"), 
+           pval = TRUE, conf.int = FALSE, xlab = "Time (month)",
+           surv.plot.heigh =1,
+           risk.table = TRUE, #add risk table 
+           break.time.by = 12, #break the time on risk table by 12 months
+           risk.table.col = "strata", #change risk table colour by groups
+           risk.table.title="Number at risk of peritonitis", #change the risk table title 
+           linetype = "strata", #change line type by groups
+           surv.median.line = "hv", #specify median survival 
+           ncensor.plot = FALSE, #show the number of censored patients 
+           ggtheme = theme_bw())
+
+# Model 4: Age group (KM only accepts categorical data) 
+# two age groups was created: 55yo and above, 18-54 (why this cutoff?)
+kaplan <- kaplan %>%
+  mutate(Age_group = ifelse(Age >= 55, 1,0))
+
+fit.kaplan.age <- survfit(Surv(m.time,event)~ Age_group, data = kaplan) 
+
+KM_age <- ggsurvplot(fit.kaplan.age, 
+           size=1, #change line size
+           legend.title = "Peritonitis-free interval by Age group", legend.labs = c("Below 55yo","Above 55yo"), 
+           pval = TRUE, conf.int = FALSE, xlab = "Time (month)",
+           surv.plot.heigh =1,
+           risk.table = TRUE, #add risk table 
+           break.time.by = 12, #break the time on risk table by 12 months
+           risk.table.col = "strata", #change risk table colour by groups
+           risk.table.title="Number at risk of peritonitis", #change the risk table title 
+           linetype = "strata", #change line type by groups
+           surv.median.line = "hv", #specify median survival 
+           ncensor.plot = FALSE, #show the number of censored patients 
+           ggtheme = theme_bw())
+
+# Model 5: Diabetes as primary renal disease 
+fit.kaplan.dm <- survfit(Surv(m.time,event)~ dm, data = kaplan) 
+
+KM_dm <- ggsurvplot(fit.kaplan.dm, 
+           size=1, #change line size
+           legend.title = "Peritonitis-free interval by Primary Renal Disease (diabetes)", legend.labs = c("Not DM","Yes DM"), 
+           pval = TRUE, conf.int = FALSE, xlab = "Time (month)",
+           surv.plot.heigh =1,
+           risk.table = TRUE, #add risk table 
+           break.time.by = 12, #break the time on risk table by 12 months
+           risk.table.col = "strata", #change risk table colour by groups
+           risk.table.title="Number at risk of peritonitis", #change the risk table title 
+           linetype = "strata", #change line type by groups
+           surv.median.line = "hv", #specify median survival 
+           ncensor.plot = FALSE, #show the number of censored patients 
+           ggtheme = theme_bw())
+
+# Model 6: Comorbidity of Cancer 
+fit.kaplan.comob.cancer <- survfit(Surv(m.time,event)~ comob.cancer, data = kaplan) 
+
+KM_comob.cancer <- ggsurvplot(fit.kaplan.comob.cancer, 
+           size=1, #change line size
+           legend.title = "Peritonitis-free interval by Cancer comorbidity", legend.labs = c("No cancer","Yes cancer"), 
+           pval = TRUE, conf.int = FALSE, xlab = "Time (month)",
+           surv.plot.heigh =1,
+           risk.table = TRUE, #add risk table 
+           break.time.by = 12, #break the time on risk table by 12 months
+           risk.table.col = "strata", #change risk table colour by groups
+           risk.table.title="Number at risk of peritonitis", #change the risk table title 
+           linetype = "strata", #change line type by groups
+           surv.median.line = "hv", #specify median survival 
+           ncensor.plot = FALSE, #show the number of censored patients 
+           ggtheme = theme_bw())
+
+# Model 7: Comorbidity of CCF 
+fit.kaplan.comob.ccf <- survfit(Surv(m.time,event)~ comob.ccf, data = kaplan) 
+
+KM_comob.ccf <- ggsurvplot(fit.kaplan.comob.ccf, 
+           size=1, #change line size
+           legend.title = "Peritonitis-free interval by CCF comorbidity", legend.labs = c("No CCF","Yes CCF"), 
+           pval = TRUE, conf.int = FALSE, xlab = "Time (month)",
+           surv.plot.heigh =1,
+           risk.table = TRUE, #add risk table 
+           break.time.by = 12, #break the time on risk table by 12 months
+           risk.table.col = "strata", #change risk table colour by groups
+           risk.table.title="Number at risk of peritonitis", #change the risk table title 
+           linetype = "strata", #change line type by groups
+           surv.median.line = "hv", #specify median survival 
+           ncensor.plot = FALSE, #show the number of censored patients 
+           ggtheme = theme_bw())
+
+# Model 8: Brand 
+fit.kaplan.brand <- survfit(Surv(m.time,event)~ brand, data = kaplan) 
+
+KM_brand <- ggsurvplot(fit.kaplan.brand, 
+           size=1, #change line size
+           legend.title = "Peritonitis-free interval by PD Brand", legend.labs = c("Baxter","Fresenius", "Lucenxia"), 
+           pval = TRUE, conf.int = FALSE, xlab = "Time (month)",
+           surv.plot.heigh =1,
+           risk.table = TRUE, #add risk table 
+           break.time.by = 12, #break the time on risk table by 12 months
+           risk.table.col = "strata", #change risk table colour by groups
+           risk.table.title="Number at risk of peritonitis", #change the risk table title 
+           linetype = "strata", #change line type by groups
+           surv.median.line = "hv", #specify median survival 
+           ncensor.plot = FALSE, #show the number of censored patients 
+           ggtheme = theme_bw())
+
+summary(fit.kaplan)
+summary(fit.kaplan)$table
+summary(fit.kaplan, times=c(12, 24, 36, 48, 60))
+
+
+############################################################
+
+########### Plot Cumulative Incidence Curve ################
+
+#NULL Model 
+
+fit.kaplan <- survfit(Surv(m.time,event)~1, data = kaplan) 
+#SDPID has a lot of missing data, SDPID.x/SDPID.y has no missing data
+
+CI.KM1<- ggsurvplot(fit.kaplan, fun = "event",
+           pval = FALSE, conf.int = TRUE, xlab = "Time (month)",
+           risk.table = TRUE, #add risk table 
+           break.time.by = 12, #break the time on risk table by 12 months
+           risk.table.col = "strata", #change risk table colour by groups
+           linetype = "strata", #change line type by groups
+           surv.median.line = "hv", #specify median survival 
+           ggtheme = theme_bw())
+
+
+
+
+``` 
+
+```{r coxph, eval=F, echo=F, cache=F, results=F, warning=F, message=F}
+
+cox_sex<-coxph(Surv(m.time, event) ~ PtSex, data = kaplan)
+summary(cox_sex)
+
+#to conduct multiple UNIVARIATE cox regression with a helper function 
+covariates<-c("Age_group","PtSex","toxic.nephropthy","glomerulonephritis", "obs.uropathy", "ADPKD", "month_diag", "month_pd", "hpt", "dm","comob.dm", "comob.hpt", "comob.peptic_ulcer", "comob.cerebrovas", "comob.chro_res", "comob.ihd", "comob.cancer", "comob.ccf", "comob.impair_vision", "comob.amputation", "comob.chron_liver","comob.peri_vas", "comob.psy", "comob.GI", "comob.cvd", "comob.tb","comob.ment_retard", "comob.dementia", "comob.sub_abuse", "brand", "PtAssist")
+
+# "PtRace"-> why this variable does not work?  "PDRegimen" "site"
+
+univ_formulas<- sapply(covariates, 
+                       function(x) as.formula(paste('Surv(time, event)~', x)))
+
+univ_models <- lapply(univ_formulas, function(x){coxph(x, data = kaplan)})
+#Extract data
+univ_results <- lapply(univ_models,
+                       function(x){ 
+                          x <- summary(x)
+                          p.value<-signif(x$wald["pvalue"], digits=3)
+                          wald.test<-signif(x$wald["test"], digits=3)
+                          beta<-signif(x$coef[1], digits=3);#coeficient beta
+                          HR <-signif(x$coef[2], digits=3);#exp(beta)
+                          HR.confint.lower <- signif(x$conf.int[,"lower .95"], 2)
+                          HR.confint.upper <- signif(x$conf.int[,"upper .95"],2)
+                          HR <- paste0(HR, " (", 
+                                       HR.confint.lower, "-", HR.confint.upper, ")")
+                          res<-c(beta, HR, wald.test, p.value)
+                          names(res)<-c("beta", "HR (95% CI for HR)", "wald.test", 
+                                        "p.value")
+                          return(res)
+                          #return(exp(cbind(coef(x),confint(x))))
+                         })
+res <- t(as.data.frame(univ_results, check.names = FALSE))
+as.data.frame(res)
+
+# since PtRace, PDRegimen, PtAssist and site does not work, we need to singularly test the variable
+cox_race<-coxph(Surv(m.time, event) ~ PtRace, data = kaplan)
+summary(cox_race)   #some significant, include 
+                    #perhaps this is because some of the races were significant, while some were not                           significant -> this is why it causes many V1, V2, V3 to appear 
+
+cox_site<-coxph(Surv(m.time, event)~site, data = kaplan)
+summary(cox_site)  #some significant, include 
+
+cox_pdregimen <- coxph(Surv(m.time, event) ~ PDRegimen, data = kaplan)
+summary(cox_pdregimen)  #not significant, exclude (perhaps too many missing data?)
+
+###
+### Significant variables (p<0.1): Age_group, dm, brand, race, site
+###
+## Multivariate Cox regression analysis
+multiv_cox <- coxph(Surv(m.time, event) ~ PtRace+Age_group+PtAssist+dm+brand+site, data = kaplan)
+summary(multiv_cox)
+
+#Visualise the estimated distribution of survival times 
+cox_plot <- ggsurvplot(survfit(multiv_cox), 
+                       data = kaplan, 
+                       palette= '#2E9FDF', 
+                       break.time.by=12,
+                       ggtheme = theme_minimal())
+
+```
+
+```{r coxph2, eval=F, echo=F, cache=F, results=F, warning=F, message=F}
+# Cause-specific hazard models on the competing risk - technique failure 
+
+kaplan <- kaplan %>%
+  mutate(event2=ifelse(PtOutcomeID==2, 1,0)) %>%
+  relocate(event2, .after=event)
+
+multiv_cox2 <- coxph(Surv(m.time, event2) ~ PtRace+Age_group+PtAssist+dm+brand+site, data = kaplan)
+summary(multiv_cox2)
+
+#Visualise the estimated distribution of survival times 
+cox_plot <- ggsurvplot(survfit(multiv_cox), 
+                       data = kaplan, 
+                       palette= '#2E9FDF', 
+                       break.time.by=12,
+                       ggtheme = theme_minimal())
+```
+
+```{r wrangle_cmprsk_peri, eval=T, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE}
+# need to redo the steps in all_data EXCEPT dropping patients with PtOutcomeID==0
+sh_final<-merge(sh7_8, sh_demo.fin, by="PatientID", all = TRUE)
+
+sh_final<-arrange(sh_final, PatientID, PtDateOutcome)
+
+## change column order 
+##  | col_order = c("PatientID", "PtDateOutcome","PtOutcomeID", "event", "PtDateCommence", "PtDateCentre", "ESRFDateFirstRx", "day_diag", "day_pd") 
+
+sh_final<-sh_final %>%
+  relocate(PtDateCommence, .after=PatientID) %>%
+  relocate(ESRFDateFirstRx, .after=PtDateCommence) %>%
+  relocate(PtDateOutcome, .after = ESRFDateFirstRx) %>%
+  relocate(PtOutcomeID, .after = PtDateOutcome) %>%
+  relocate(day_diag, .after = PtOutcomeID) %>%
+  relocate(day_pd, .after=day_diag) %>%
+  relocate(event, .after=day_pd)
+
+#If we don't drop PtOutcomeID==0, many rows will remain as NA
+
+sh_final$PtDateOutcome[which(is.na(sh_final$PtDateOutcome))]<- as.Date("2018-12-31")
+sh_final$event[which(is.na(sh_final$event))]<- 0 
+sh_final$PtOutcomeID[which(is.na(sh_final$PtOutcomeID))]<- 0
+
+# create t.start, tstop, time 
+sh_final<-sh_final %>%
+  mutate(t.start2=0) %>%
+  relocate(t.start2, .after=event) %>%
+  mutate(t.stop=PtDateOutcome - PtDateCommence) %>%
+  relocate(t.stop, .after=t.start2)
+
+sh_final<-sh_final %>%
+  group_by(PatientID) %>%
+  mutate(Index=row_number()) %>%
+  relocate(Index, .after=t.stop) 
+
+sh_final<-sh_final %>%
+  group_by(PatientID) %>%
+  mutate(t.start = ifelse(Index>1, lag(t.stop), 0)) %>%
+  relocate(t.start, .before=t.stop)
+  
+ ## sh_final$t.start[sh_final$Index>1]<-lead(sh_final$t.stop) #this doesn't work 
+
+## create a third duration variable 'time' 
+sh_final['time']<-sh_final$t.stop - sh_final$t.start
+sh_final<-relocate(sh_final, time, .after = t.stop)
+
+
+
+sh_final <- sh_final %>%
+  relocate(PtSex, .after=Index) %>%
+  relocate(PtRace, .after=PtSex) %>%
+  relocate(Age, .after=PtRace)
+
+sh_final <- sh_final %>%
+  mutate(death=ifelse(PtOutcomeID==1, 1, 0)) %>%
+  relocate(death, .after=Age)
+
+# check the category of Patient Outcome 
+#plot_bar(sh_final$PtOutcomeID)  #shows 7 categories
+                                #12: peritonitis, 1: death, 13: ESI, 
+                                #2: HD, 8: recover kidney function,                                 
+                                #6: lost to f/up, 3: transplanted 
+
+comp <- sh_final #prepare a new datasets for wrangling for cox
 
 #create a new variable "status" 
 comp['status']<- NA
 comp <- comp %>% 
   relocate(status, .after= PtOutcomeID)
-
-comp$status[which(comp$PtOutcomeID==0)]   <-0 #no event
-comp$status[which(comp$PtOutcomeID==12)]  <-1 #peritonitis
-comp$status[which(comp$PtOutcomeID==2)]   <-2 #transfer to HD are denoted competing risks
-comp$status[which(is.na(comp$status))]    <-0 #all other outcomes are censored 
-comp$status<-as.factor(comp$status)
-
 
 comp <- comp %>% 
   arrange(PatientID, PtDateOutcome) %>%
@@ -792,19 +1171,56 @@ comp <- comp %>%
   arrange(PatientID, PtDateOutcome)  %>%
   filter(Index==1)
 
-# create a new variable "dm" to denote primary renal disease of diabetes 
-comp <- comp %>%
-  mutate(dm =ifelse(PtRenal1==2, 1,0)) %>%
-  mutate(gl =ifelse(PtRenal1==3, 1,0)) %>%
-  mutate(uro=ifelse(PtRenal1==4, 1,0)) %>%
-  mutate(neph=ifelse(PtRenal1==11, 1,0)) %>%
-  mutate(hpt=ifelse(PtRenal1==12, 1,0)) %>%
-  mutate(AD=ifelse(PtRenal1==15, 1,0)) %>%
-  mutate(her.neph=ifelse(PtRenal1==16, 1,0)) 
+## | use the newer pivot_wider() from tidyverse/tidyr to make the conversion 
+## | add a new column to indicate primary renal disease is "present" 
+#comp['prim.dis']<-as.integer(1)
+#class(comp$prim.dis)
+
+#comp <- comp %>%
+#  pivot_wider(
+#    names_from = PtRenal1, 
+#    values_from = prim.dis
+#  )
+
+##  | rename the new columns 
+#names(comp)[64:74] <- c("toxic.nephropthy", "hpt","glomerulonephritis", "dm", "unknown", "obs.uropathy","nil", "miss","others", "hereditary.nephritis", "ADPKD")
+
+##  | drop column nil and miss 
+#comp<- comp[,-(70:71)]
+
+##  | drop PtHeight and PtWeight (for now since too many missing data)
+comp <- subset(comp, select = -c(t.start2, NotifID, PtRRTID, SDPID, SDPID.x, PtARID, NotifID.x, PtRRTID.x, givendate.x,NotifID.y, PtRRTID.y, PtRenalSpecify, PtRenal2, PtRenalSpecify2, givendate.y, PtHeight, PtWeight, Modality))
+
+#fill in "status": 0=censor, 1=peritonitis, 2=competing risk events (all events)
+comp$status[which(comp$PtOutcomeID==0)]<-0
+comp$status[which(comp$PtOutcomeID==12)]<-1
+comp$status[which(is.na(comp$status))]<-2
 
 
+#expand the variable "PtSex" and "PtRace" to dummy tables 
+#comp['female'] <- NA
+#comp$female[which(comp$PtSex==2)]<-1
+#comp$female[which(is.na(comp$female))]<-0 
+
+#comp['race_ind']<-as.integer(1)
+
+#comp <- comp %>%
+#  pivot_wider(
+#    names_from = PtRace, 
+#    values_from = race_ind
+#  )
+
+#names(comp)[55:60] <- c("malay", "chinese","indian", "bumi.sarawak", "others", "bumi.sabah")
+
+######
+######
+### fill in PtAssist arbitrily then verify later 
+######
+######
+comp$PtAssist[which(is.na(comp$PtAssist))]<-1
 
 
+comp[is.na(comp)]<-0 #this step will cause many missing data in PtAssist to become "0"
 
 #convert day_diag and day_pd to months 
 comp['month_diag']<-comp$day_diag/30
@@ -831,59 +1247,299 @@ comp$site <- as.factor(comp$site)
 ## combine the dataset with sh11_pdsys 
 comp <- merge(comp, sh11_pdsys, by="PatientID", all=TRUE)
 
-# create a new variable "Age2" to make it similar to Cox PH model 
-library(AMR) 
+
+# create a new variable "dm" to denote primary renal disease of diabetes 
 comp <- comp %>%
-  mutate(Age2=Age)
+  mutate(dm=ifelse(PtRenal1==2, 1,0)) %>%
+  relocate(dm, .after=PtAssist)
 
-comp$Age2 <- age_groups(comp$Age, split_at=c(18,30,40,50,60,70,80,90))
+# create a new variable "Age_group" to make it similar to Cox PH model 
+comp <- comp %>%
+  mutate(Age_group = ifelse(Age >= 55, 1,0))
 
-comp$Age2<-factor(comp$Age2, ordered = FALSE)
-  
 # create a new variable "m.time" to denote time in month 
 comp['m.time']<- comp$time/30
 
 comp = comp %>%
   relocate(m.time, .after=time)
 
-##  | drop PtHeight and PtWeight (for now since too many missing data) and other variables 
-comp <- subset(comp, select = -c(PtDateCommence, ESRFDateFirstRx,PtDateOutcome,Index,day_diag,day_pd, event,PtDateCentre, DataYear,PtDateBirth, PtCitizenship, PtABO,t.start2, NotifID, PtRRTID, SDPID, SDPID.x, PtARID, NotifID.x, PtRRTID.x, givendate.x,NotifID.y, PtRRTID.y, PtRenalSpecify, PtRenal2, PtRenalSpecify2, givendate.y, PtHeight, PtWeight, Modality))
-
-
-######
-######
-### verify source for PtAssist
-######
-######
-comp$PtAssist[which(is.na(comp$PtAssist))]<-1
-comp$PtAssist[which(comp$PtAssist==9999)]<-1
-
-
-comp[is.na(comp)]<-0 
-
-### re-arrange the columns by column names 
-col_order <- c("PatientID", "t.start", "t.stop", "time", "m.time", "PtOutcomeID", "status","death", "PtSex", "PtRace", "Age", "Age2", "PtAssist", "PtRenal1","dm","gl","uro","neph","hpt","AD","her.neph", "brand", "site", "PDSystem", "PDRegimen", "month_diag", "month_pd", "SDPID.y","comob.hpt", "comob.dm", "comob.peptic_ulcer", "comob.other_cardiac", "comob.cerebrovas", "comob.chro_res", "comob.ihd", "comob.other", "comob.cancer", "comob.ccf", "comob.impair_vision", "comob.amputation", "comob.chron_liver", "comob.peri_vas", "comob.psy", "comob.GI", "comob.cvd", "comob.tb", "comob.ment_retard", "comob.dementia", "comob.sub_abuse")
-
-comp <- comp[,col_order]
-
-
 ## double check the data structure of the "comp" data frame 
-str(comp)   
+str(comp)   #status     : numeric 
+            #day_diag   : difftim 
+            #day_pd     : difftime 
+            #month_diag : difftime
+            #month_pd   : difftime
+            #event      : numeric 
+            #time       : difftime
+            #death      : numeric 
+            #PtAssist   : numeric 
+            #dm         : numeric 
+            #comob.hpt  : numeric 
+            #comob.dm   : numeric 
+            #brand      : numeric 
+            #Age_group  : numeric
 
 # Change variables back to factor 
-a <- c("status","death", "PtSex", "PtRace","Age2", "PtAssist", "PtRenal1","dm","gl","uro","neph","hpt","AD","her.neph", "brand", "site", "PDSystem", "PDRegimen","SDPID.y","comob.hpt", "comob.dm", "comob.peptic_ulcer", "comob.other_cardiac", "comob.cerebrovas", "comob.chro_res", "comob.ihd", "comob.other", "comob.cancer", "comob.ccf", "comob.impair_vision", "comob.amputation", "comob.chron_liver", "comob.peri_vas", "comob.psy", "comob.GI", "comob.cvd", "comob.tb", "comob.ment_retard", "comob.dementia", "comob.sub_abuse")
+a <- c("status", "event", "death", "PtAssist", "dm", "comob.hpt", "comob.dm","brand", "Age_group")
 comp[,a]<-lapply(comp[,a], factor)
 
 # change variable from difftime to numeric 
-b <- c("month_diag", "month_pd", "time", "m.time")
+b <- c("day_diag", "day_pd", "month_diag", "month_pd", "time", "m.time")
 comp[,b]<-sapply(comp[,b], as.numeric)
 
-## check again the data structure of the "comp" data frame 
-str(comp)   #all OK
+#create a new variable "status2" to denote death as competing risk 
+comp['status2']<- NA
+comp <- comp %>% 
+  relocate(status2, .after= status)
 
-### output the final dataset as .csv 
-library(data.table)
-fwrite(comp, "comp.csv") #fastest way to write a csv file 
+comp$status2[which(comp$PtOutcomeID==0)]<-0
+comp$status2[which(comp$PtOutcomeID==12)]<-1
+comp$status2[which(comp$PtOutcomeID==1 | comp$PtOutcomeID==2)]<-2 #death & HD are denoted competing risks
+comp$status2[which(is.na(comp$status2))]<-0 
+
+comp$status2<-as.factor(comp$status2)
+
+        
+```
+
+```{r factor2ind, eval=T, echo=F, warning=F, message=F, cache=F, results=FALSE}
+library(cmprsk)
+
+##############################################################################
+# Adds-on functions to crr() function in 'cmprsk' package by Gray, RJ. 
+# Written by Luca Scrucca
+#
+# Reference: 
+# Scrucca L, Santucci A, Aversa F (2009) Regression Modeling of Competing 
+#   Risk Using R: An In Depth Guide for Clinicians. Submitted to Bone Marrow
+#   Transplantation
+##############################################################################
+
+# This ensure that the package is loaded
+if(!require(cmprsk))
+  { stop("the package 'cmprsk' is required, please install it. \nSee help(install.packages).") }
+  
+factor2ind <- function(x, baseline)
+{
+# Given a factor variable x, create an indicator matrix of dimension 
+# length(x) x (nlevels(x)-1) dropping the column corresponding to the 
+# baseline level (by default the first level is used as baseline).
+# Example:
+# > x = gl(4, 2, labels = LETTERS[1:4])
+# > factor2ind(x)
+# > factor2ind(x, "C")
+  xname <- deparse(substitute(x))
+  n <- length(x)
+  x <- as.factor(x)
+  if(!missing(baseline)) x <- relevel(x, baseline)
+  X <- matrix(0, n, length(levels(x)))
+  X[(1:n) + n*(unclass(x)-1)] <- 1
+  X[is.na(x),] <- NA
+  dimnames(X) <- list(names(x), paste(xname, levels(x), sep = ":"))
+  return(X[,-1,drop=FALSE])
+}
+
+modsel.crr <- function (object, ..., d = log(object$n)) 
+{
+  if(class(object) != "crr") 
+    stop("object is not of class 'crr'")
+  objects <- list(object, ...)
+  nmodels <- length(objects)
+  modnames <- paste("Model ", format(1:nmodels), ": ", 
+                      lapply(objects, function(x) x$call), 
+                      sep = "", collapse = "\n")
+  # add null model
+  mod0 <- object
+  mod0$loglik <- mod0$loglik.null
+  mod0$coef <- mod0$call$cov1 <- mod0$call$cov2 <- NULL
+  objects <- c(list(mod0), objects)
+  nmodels <- nmodels + 1
+  #
+  modnames <- c("Model 0: Null model", modnames)
+  ns <- sapply(objects, function(x) x$n) 
+  dfs <- sapply(objects, function(x) length(x$coef)) 
+  if(any(ns != ns[1]))
+    stop("models were not all fitted to the same dataset")
+  out <- matrix(rep(NA, 5 * nmodels), ncol = 5)
+  loglik <- sapply(objects, function(x) x$loglik)
+  crit <- sapply(objects, function(x) -2*x$loglik + d*length(x$coef))
+  out[,1] <- ns
+  out[,2] <- loglik
+  out[,3] <- dfs
+  out[,4] <- crit
+  out[,5] <- crit - min(crit)
+  if(d==log(object$n)) critname <- "BIC"
+  else if(d == 2) critname <- "AIC"
+  else critname <- "Criterion"
+  colnames(out) <- c("Num.obs", "logLik", "Df.fit", critname, paste(critname, "diff"))
+  rownames(out) <- 0:(nmodels-1)
+  title <- "Model selection table\n"
+  topnote <- modnames
+  structure(as.data.frame(out), heading = c(title, topnote), 
+            class = c("anova", "data.frame"))
+}
+
+
+
+factor2ind(comp$PtSex, 2) #female = 2
+factor2ind(comp$PtRace, 1)
+factor2ind(comp$PtAssist,1) #complete self-care=1
+factor2ind(comp$site,2) #Kedah = 2
+factor2ind(comp$PDRegimen, "1") #CAPD =1 
+factor2ind(comp$PDSystem, "101") #UltraBag = 101
+factor2ind(comp$brand, 1)#Baxter=1
+factor2ind(comp$dm, 1) #not diabetes =0 
+factor2ind(comp$Age_group, "0") # <55yo = 0
+
+```
+
+```{r cmprsk_peri, eval=F, echo=F, cache=F, results=FALSE, warning=FALSE, message=FALSE}
+
+#create a new variable "status2" to denote death as competing risk 
+comp['status2']<- NA
+comp <- comp %>% 
+  relocate(status2, .after= status)
+
+comp$status2[which(comp$PtOutcomeID==0)]<-0
+comp$status2[which(comp$PtOutcomeID==12)]<-1
+comp$status2[which(comp$PtOutcomeID==1)]<-2 #death is denoted a competing risk, and not others 
+comp$status2[which(is.na(comp$status2))]<-0 
+
+
+#create a new variable "status3" to denote technique failure as competing risk 
+comp['status3']<- NA
+comp <- comp %>% 
+  relocate(status3, .after= status2)
+
+comp$status3[which(comp$PtOutcomeID==0)]<-0
+comp$status3[which(comp$PtOutcomeID==12)]<-1
+comp$status3[which(comp$PtOutcomeID==2)]<-2 #technique failure is denoted a competing risk, and not others 
+comp$status3[which(is.na(comp$status3))]<-0
+
+str(comp)
+comp$time <- as.numeric(comp$time)
+comp$month_diag<-as.numeric(comp$month_diag)
+comp$month_pd<-as.numeric(comp$month_pd)
+
+
+
+# cbind all the variables into a vector "x"
+x <- cbind(factor2ind(comp$Age_group, 1),factor2ind(comp$dm, 1), factor2ind(comp$PtSex, 2),factor2ind(comp$PtRace, 1),factor2ind(comp$PtAssist, 1),factor2ind(comp$site, 2), comp$month_pd, comp$month_diag, factor2ind(comp$brand, 1))  #rather than include PtRenal1 as an entire category, 
+                            #I broke it down to just diabetes 
+
+head(x)
+
+#
+
+library(cmprsk)
+mod1<- crr(ftime = comp$time, fstatus = comp$status2, cov1=x, failcode = 1, cencode = 0) 
+                                              #status2=1, peritonitis 
+                                              #status = composite outcome for competing risk 
+                                                      #(technique failure + death)
+
+summary(mod1, digits = 4)
+
+#The overall p-value is necessary when modeling a factor with more than two levels; Wald test can be done to obtained this p-value 
+
+#library(aod)
+#wald.test(mod1$var, mod1$coef, Terms = 4:8)   #p-value for race 
+#wald.test(mod1$var, mod1$coef, Terms = 9:12)  #CAPD assistance including missing 
+#wald.test(mod1$var, mod1$coef, Terms = 13:24) #site
+#wald.test(mod1$var, mod1$coef, Terms = 27:28) #brand
+
+# re-run model 1 with the selected variables so I can make a shorter table 
+x2 <- cbind(factor2ind(comp$PtRace, 1), factor2ind(comp$Age_group, "0"), factor2ind(comp$PtAssist, 1), factor2ind(comp$dm, "1"), factor2ind(comp$brand, 1), factor2ind(comp$site, 2))
+
+mod1.1<- crr(ftime = comp$time, fstatus = comp$status2, x2, failcode = 1, cencode = 0) 
+                                              #status2=1, peritonitis 
+                                              #status = composite outcome for competing risk 
+                                                      #(technique failure + death)
+
+summary(mod1.1, digits = 4)
+
+
+```
+
+```{r, model_select, eval=F, echo=F, cache=F, warning=F, message=F, results=T}
+#Model selection with crrstep 
+library(crrstep)
+ftime<-comp$m.time
+#fstatus<-as.factor(comp$PtOutcomeID) #the competing risk events will have different coding, unlike "status" that categorise all competing risk events as "2" 
+fstatus<-as.factor(comp$status2) #event of interest = peritonitis, competing risk=death & HD
+formula1 <- ftime~1+Age_group+as.factor(PtSex)+as.factor(brand)+as.factor(PtRace)+ as.factor(dm)+as.factor(PtAssist)+as.factor(site)
+  ##if written as ftime~1+comp$Age <- this does not work ! 
+  
+crrstep(formula1, , fstatus, data = as.data.frame(comp),failcode=1, cencode=0, direction = "backward", criterion = "BIC")
+crrstep(formula1, , fstatus, data = as.data.frame(comp),failcode=1, cencode=0, direction = "forward", criterion = "BICcr")
+
+ans2 <- crrstep(formula1, , fstatus, data = as.data.frame(comp), direction = "backward",
+failcode=2, criterion = "BIC")
+ans2
+
+
+#model selection (manual with BIC)
+mod2<- crr(ftime = comp$time, fstatus = comp$status, x[,3:7]) #race
+mod3<- crr(ftime = comp$time, fstatus = comp$status, x[,8:15]) #Prim.Renal Disease
+mod4<- crr(ftime = comp$time, fstatus = comp$status, x[,18:20])#Assistance 
+mod5<- crr(ftime = comp$time, fstatus = comp$status, x[,22:33]) #site
+mod6<- crr(ftime = comp$time, fstatus = comp$status, x[,36:37]) #brand
+
+mod7<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,8:15)]) #race, Renal1
+mod8<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,18:20)]) #race, Assistance
+mod9<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,22:33)]) #race, Site
+mod10<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,36:37)]) #race, brand
+mod11<- crr(ftime = comp$time, fstatus = comp$status, x[,c(8:15, 18:20)]) #Renal1, Assist
+mod12<- crr(ftime = comp$time, fstatus = comp$status, x[,c(8:15, 22:33)]) #rRenal1, site
+mod13<- crr(ftime = comp$time, fstatus = comp$status, x[,c(8:15, 36:37)]) #Renal1, brand
+mod14<- crr(ftime = comp$time, fstatus = comp$status, x[,c(22:33, 36:37)]) #Site, Brand 
+
+mod15<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,8:15,18:20)])#race, Renal1, assist
+mod16<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,8:15,22:33)])#race, renal1, site 
+mod17<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,8:15,36:37)])#race, renal1, brand 
+mod18<- crr(ftime = comp$time, fstatus = comp$status, x[,c(8:15,18:20,22:33)])#renal1, assist, site 
+mod19<- crr(ftime = comp$time, fstatus = comp$status, x[,c(8:15,18:20, 36:37)])#renal1, assist, brand 
+mod20<- crr(ftime = comp$time, fstatus = comp$status, x[,c(18:20, 22:33, 36:37)])#assist, site, brand 
+mod21<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7, 22:33, 36:37)])#Race, site, brand 
+
+mod22<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,8:15,18:20, 22:33)]) #race, renal1, assist, site 
+mod23<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,8:15,18:20, 36:37)]) #race, renal1, assist, brand 
+
+mod24<- crr(ftime = comp$time, fstatus = comp$status, x[,c(3:7,8:15,18:20, 22:33, 36:37)]) #all 
+
+
+modsel.crr(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, mod10, mod11, mod12, mod13, mod14, mod15, mod16, mod17, mod18, mod19, mod20, mod21, mod22, mod23, mod24)
+
+summary(mod6)
+
+#Model diagnostic 
+mod2$res
+par(mfrow=c(1,3), mar=c(4.5,4,2,1))
+for(j in 1:ncol(mod2$res))
+  scatter.smooth(mod2$uft, mod2$res[,j],
+                 main = names(mod2$coef)[j],
+                 xlab = "Failure time",
+                 ylab = "Schoenfeld residuals")
+
+# need to read more about Schoenfield? plot 
+
+# Model-based estimation of the CIF 
+x0 = cbind(comp$PtRace, factor2ind(levels(comp$PtRace), "1"))
+x0  
+
+pred<-predict(mod2, x0)
+pred
+
+plot(pred, lty = 1:4, xlab="failure time", ylab="CIF")
+legend("topleft", legend = levels(comp$PtRace), lty = 1:6, title = "Race")
+
+
+cuminc(ftime = comp$time, fstatus = comp$status, cencode = 0, na.action = na.omit )
+
+x0= cbind("1")
+pred2<-predict(mod6, x0)
+graph1 <-plot.cuminc(y)
+
+
 
 ```
 
@@ -906,35 +1562,31 @@ mykable = function(x){
 #data use here is "comp" 
   #status == 0, no outcome 
   #status == 1, peritonitis 
-  #status == 2, transfer to HD as competing risk 
-  #variables included: PtRace,PtSex, PtAssist, dm, gl,uro, neph,hpt, AD, her.neph, Age2 brand, site, month_diag, month_pd
-
+  #status == 2, death or HD as competing risk 
+  #variables included: PtRace, Age_group, PtAssist, dm, brand, site 
 comp = comp %>% 
   mutate(
     #overall survival 
-    status_os = ifelse(status == 1, 1, #peritonitis
+    status_os = ifelse(status2 == 1, 1, #peritonitis
                                       0), #no peritonitis 
     
     #disease specific survival 
     status_dss = case_when(
-      status == 0 ~ 0, #no event  
-      status == 1 ~ 1, #peritonitis 
+      status2 == 0 ~ 0, #no event  
+      status2 == 1 ~ 1, #peritonitis 
       TRUE ~ 0),    #Other causes are censored 
     
     #competing risk regression 
     status_crr = case_when(
-      status == 0 ~ 0, #no event 
-      status == 1 ~ 1, #peritonitis 
-      status == 2 ~ 2,
-      TRUE ~ 0), #competing risk 
+      status2 == 0 ~ 0, #no event 
+      status2 == 1 ~ 1, #peritonitis 
+      TRUE ~ 2), #competing risk 
     
     #Label and recode other variable 
-    Age2 = factor(Age2) %>%
-      fct_recode("18-29" = "18-29", 
-                 "30-39" = "30-39",
-                 "40-49" = "40-49",
-                 "50-59" = "50-59",
-                 "60-69" = "60-69") %>%
+    Age = ff_label(Age, "Age (years)"), #ff_label to make table friendly var labels 
+    Age_group = factor(Age_group) %>%
+      fct_recode(">55 yo" = "1", 
+                 "<55 yo" = "0") %>%
       ff_label("Age Group"),
     PtRace = factor(PtRace) %>%
       fct_recode("Malay" = "1", 
@@ -950,38 +1602,14 @@ comp = comp %>%
                  "Dependent" = "3") %>%
       ff_label("CAPD Assistance"), 
     dm = factor(dm) %>%
-      fct_recode("Yes" = "1", 
-                 "No" = "0") %>%
-      ff_label("Diabetes"), 
-    gl = factor(gl) %>%
-      fct_recode("Yes" = "1", 
-                 "No" = "0") %>%
-      ff_label("Glomerulonephritis"), 
-    uro = factor(uro) %>%
-      fct_recode("Yes" = "1", 
-                 "No" = "0") %>%
-      ff_label("Obstructive uropathy"), 
-    neph = factor(neph) %>%
-      fct_recode("Yes" = "1", 
-                 "No" = "0") %>%
-      ff_label("Drugs/toxic nephropathy"), 
-    hpt = factor(hpt) %>%
-      fct_recode("Yes" = "1", 
-                 "No" = "0") %>%
-      ff_label("Hypertension"), 
-    AD = factor(AD) %>%
-      fct_recode("Yes" = "1", 
-                 "No" = "0") %>%
-      ff_label("ADPKD"), 
-    her.neph = factor(her.neph) %>%
-      fct_recode("Yes" = "1", 
-                 "No" = "0") %>%
-      ff_label("Hereditary nephritis"), 
+      fct_recode("Diabetic" = "1", 
+                 "Non-diabetic" = "0") %>%
+      ff_label("Primary Renal Disease"), 
     brand = factor(brand) %>%
       fct_recode("Baxter" = "1", 
-                 "Fresenius" = "2", 
+                 "FMC" = "2", 
                  "Lucenxia" = "3") %>%
-      ff_label("PD Company"), 
+      ff_label("PD brand"), 
     site = factor(site) %>%
       fct_recode("Kedah" = "2", 
                  "Penang" = "3",
@@ -996,26 +1624,50 @@ comp = comp %>%
                  "Sabah" = "12", 
                  "Sarawak" = "13", 
                  "KL" = "14") %>%
-      ff_label("Treatment Centre"),
-    PDSystem = factor(PDSystem) %>%
-      fct_recode("Ultrabag"            = "101", 
-                 "Icodextrin"          = "102", 
-                 "HomeChoice/Pro"      = "105",
-                 "Baxter (unknown)"    = "188", 
-                 "Andy Disc"           = "201", 
-                 "Stay Safe"           = "202", 
-                 "Balance"             = "204",
-                 "Sleep Safe"          = "206", 
-                 "Fresenius (unknown)" = "288", 
-                 "Intellis"            = "301") %>%
-      ff_label("PD brands")
+      ff_label("Treatment Centre")
     )
 
 #relocate the status columns 
 comp = comp %>%
-  relocate(status_os, .after=status) %>%
+  relocate(status2, .after=status) %>%
+  relocate(status_os, .after=status2) %>%
   relocate(status_dss, .after=status_os) %>%
   relocate(status_crr, .after=status_dss)
+
+#KAPLAN MEIER SURVIVAL ESTIMATORS 
+library(survival)
+
+survival_object = comp %$% #beware of the exposition paramter, and NOT %>%
+  Surv(time = m.time, status_os)
+
+#explore 
+head(survival_object) # + marks censoring, in this case "no peritonitis" 
+
+# Expressing time in months 
+survival_object = comp %$%
+  Surv(time/30, status_os)
+
+# KM ANALYSIS FOR THE WHOLE COHORT 
+
+# to plot survival stratified by  single grouping variable, substitute "survival_object~1" by "survival_object~factor" 
+
+#overall survival in whole cohort 
+ my_survfit = survfit(survival_object ~ 1, data = comp)
+ my_survfit  #1149 patients, 418 events 
+
+#Life table 
+# A tabular form of KM plot that shows survival as a proportion, together with confidence limits 
+
+summary(my_survfit, times = c(0, 12, 24, 36, 48, 60))
+
+
+# Kaplan Meier Plot 
+dependent_os = "Surv(time/30, status_os)"
+explanatory = c("brand")
+
+# comp %>%
+#   surv_plot(dependent_os, explanatory, pval=TRUE)
+
 
 # COX PROPORTIONAL HAZARD REGRESSION 
 
@@ -1023,7 +1675,7 @@ comp = comp %>%
 dependent_os = "Surv(m.time, status_os)"
 dependent_dss = "Surv(m.time, status_dss)"
 dependent_crr = "Surv(m.time, status_crr)"
-explanatory = c("PtRace", "Age2", "PtAssist", "dm", "gl","neph","hpt","AD","her.neph", "site", "brand")
+explanatory = c("PtRace", "Age_group", "PtAssist", "dm", "brand", "site")
 
 comp %>% 
   finalfit(dependent_os, explanatory) # %>%
@@ -1039,22 +1691,72 @@ comp %>%
 
 #Reduced model 
 #if you are using a backwards selection approach or similar, a reduced model can be directly specified and compared. The full model can be kept or dropped 
-## variables that are significant at p<0.1 in the Cox univriable
 
-explanatory_multi = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")
+explanatory_multi = c("PtRace", "dm", "brand", "site")
 
 comp %>%
   finalfit(dependent_os, explanatory, explanatory_multi, keep_models = TRUE) %>%
   mykable()
 
+#Testing for porportional hazard
+#the cox.zph() function from the survival package allows us to test this assumption for each variable. The plot of scaled Schoenfeld residuals should be a horizontl line. The included hypothesis test identifies whether the gradient differs from zero for each variables. No variable significantly differs from zero at the 5% significance level 
 
+# explanatory = c("PtRace", "Age_group", "PtAssist", "dm", "brand", "site")  #here Age got issue, might need to    change to Age_group - later
+# comp %>% 
+#   coxphmulti(dependent_os, explanatory) %>%
+#   cox.zph() %>%
+#   {zph_result <<- .} %>%
+#   plot(var=5)
+
+# zph_result
+
+
+#Stratified models
+# including a strata() term will result in a separate baseline hazard function being fit for each level in the stratification variable. It will no longer be possible to make direct inference on the effect associated with that variable 
+
+explanatory = c("PtRace", "Age_group", "PtAssist", "dm", "brand", "site", "strata(DataYear)") #DataYear might not be the the best strata() term, but just to illustrate
+
+comp %>% 
+  finalfit(dependent_os, explanatory) %>%
+  mykable()
+
+
+#Correlated Groups of Observations 
+# to account for any higher structure in the data, e.g. patients are clustered within particular hospitals 
+# Two broad approach to dealing with correlated groups of observatio n
+
+# cluster() term: implies a generalised estimating equation (GEE) approach. A standard Cox PH model is fitted but the standard errors of the estimated hazard ratios are adjusted to account for correlations 
+
+# frailty() term: implies a mixed effect model, where specific random effects term(s) are directly incorporated into the model 
+
+# Both approaches achieve the same goal in different ways. the latter approach is favoured because of its flexibility and own preference. Note: cluster() and frailty() cannot be combined in the same model 
+
+#Cluster model 
+explanatory = c("PtRace", "Age_group", "PtAssist", "brand", "dm", "cluster(site)")
+comp %>% 
+  finalfit(dependent_os, explanatory) %>%
+  mykable()
+
+
+#frailty model 
+explanatory = c("PtRace", "Age_group", "PtAssist", "brand", "dm", "frailty(site)")
+comp %>% 
+  finalfit(dependent_os, explanatory) %>%
+  mykable()
+
+
+#Hazard ratio plot 
+#  comp %>% 
+#    hr_plot(dependent_os, explanatory)
+
+ 
 #COMPETING RISK REGRESSION 
 
 #the Fine & Gray model is one option to deal with competing risk. The crr() syntax differs from survival::coxph() but finalfit brings these together 
 
 #it uses the finalfit::ff_merge() function, which can join any number of models together 
  
-explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")
+explanatory = c("PtRace", "Age_group", "PtAssist", "brand", "dm", "site")
 dependent_dss = "Surv(m.time, status_dss)"
 dependent_crr = "Surv(m.time, status_crr)"
 
@@ -1065,7 +1767,7 @@ dependent_crr = "Surv(m.time, status_crr)"
     #Cox PH univariable 
       ff_merge(
         comp %>% 
-          coxphuni(dependent_dss, explanatory) %>%
+          coxphmulti(dependent_dss, explanatory) %>%
           fit2df(estimate_suffix = " (DSS CPH univariable)")
       ) %>%
     #Cox PH multivariable 
@@ -1088,7 +1790,7 @@ dependent_crr = "Surv(m.time, status_crr)"
 
 
 ### Only CPH and competing risk   
-explanatory = c("Age2","PtAssist", "brand", "site")
+explanatory = c("Age_group","PtAssist", "brand", "site")
 dependent_dss = "Surv(m.time, status_dss)"
 dependent_crr = "Surv(m.time, status_crr)"
 
@@ -1120,7 +1822,7 @@ tab1 <- comp %>%
 
 # Introduction
 
-Peritonitis is an important medical event for patients who undergo peritoneal dialysis (PD). Most time-to-event (TTE) studies on peritonitis did not consider competing risk events. A competing risk is defined as the event that precludes the occurence the event of interest [@gooleyEstimationFailureProbabilities1999]. E.g. premature death or technique failure that precludes the occurence of peritonitis. 
+Peritonitis is an important medical event for patients who undergo peritoneal dialysis (PD). Most time-to-event (TTE) studies on peritonitis did not consider competing risk events. A competing risk is defined as the event that precludes the occurence the event of interest [@gooleyEstimationFailureProbabilities1999]. E.g. premature death or technique failure that preclude the occurence of peritonitis. 
 
 ## Objectives
 
@@ -1131,26 +1833,25 @@ Peritonitis is an important medical event for patients who undergo peritoneal di
 
 A prospective cohort of incident PD patients `(n=1149)` between January 2014 and December 2018 was included in the analysis. Competing risk regression models based on cause-specific and subdistribution hazards of first peritonitis were discussed. 
 
-The event of interest was `first peritonitis`. Competing risk events were composite events of `death` and `technique failure` prior to the first peritonitis. The CI function for individual competing risk event was calculated using the Fine&Gray model (subdistribution hazards) and the Cox proportional hazard model (cause-specific hazards). 
+The event of interest was `first peritonitis`. A competing risk event was defined as the combined events of `death` and `technique failure` prior to the first peritonitis.Crude risk of peritonitis was estimated using the Kaplan-Meier approach. Cause-specific (Cox proportional, CPH) and subdistribution hazard (Fine & Gray, FG) models were used to estimate the competing risk of peritonitis.  
 
-To avoid overfitting the model, we considered 9 baseline covariates: age, gender, race, diabetes as primary renal disease, requirement for assistance to complete daily PD, dialysis centre, time since first PD (months), time since diagnosis of ESRF, and brand of PD product. 
+To avoid overfitting the model, we considered 9 baseline covariates: age, gender, race, diabetes as primary renal disease, assistance for daily PD, dialysis centre (between states comparison), time since first PD (months), time since diagnosis of ESRF (months), and the brand of PD product. 
 
-We further fit multiple subdistribution hazard models using the "backward" selection process and select the model with the lowest BIC value. 
-
+We used a "backward" selection process and *p*-value (*p*<0.1) to guide model development. The Bayesian information criterion (BIC) was used to select the most parsimonious model for the subdistribution hazard. 
 
 # Results
 
-## Overall time-to-first-peritonitis in the whole cohort 
+## Crude risk of peritonitis
 
 There were a total of 1149 patients in this cohort, with 418 episodes of first peritonitis reported. KM analysis indicated that the median time to first peritonitis was 39.9 months. 
 
 ## Cause-specific hazard 
 
-Cox proportional hazard (CPH) regression was used to evaluate the cause-specific hazard of peritonitis. Univariate analysis indicates that *Age group*, *Assistance to complete CAPD*, *PD brand*, *Diabetes as primary renal disease*, and *Treatment centre* were significant covariates (*p*<0.1) and should be included in the subsequent multivariate analysis.  A subsequent multivariate CPH analysis indicated showed that *Age group* `(HR: 1.43; 95% CI: 1.13-1.78)`, *Partial Assistance for CAPD* `(HR: 1.37; 95% CI: 1.04-1.80)`, and the *FMC brand* `(HR: 1.69; 95% CI 1.38-2.06)` were significant risk factors for first peritonitis. 
+Cox proportional hazard (CPH) regression was used to evaluate the cause-specific hazard of peritonitis. Univariate analysis indicates that *"age group"*, *"assistance for daily PD"*, *"PD brand"*, *"diabetes as primary renal disease"*, and *"treatment centre"* were significant covariates (*p*<0.1) and should be included in the subsequent multivariate analysis.  Multivariate CPH analysis indicated showed that *"age group"* `(HR: 1.42; 95% CI: 1.13-1.78)`, *"partial Assistance for CAPD"* `(HR: 1.37; 95% CI: 1.04-1.80)`, and the *"FMC brand"* `(HR: 1.69; 95% CI 1.38-2.06)` were significant risk factors for first peritonitis. 
 
 ## Subdistribution hazard 
 
-Competing risk analysis using the Fine & Gray model suggested that, when compared to the Baxter PD product, FMC product reported a higher rate of peritonitis occurence in the entire cohort `(HR: 1.71; 95% CI: 1.40-2.09)`. 
+Competing risk analysis using the FG model suggested that, when compared to the Baxter PD product, FMC product reported a higher probability of peritonitis occurence in the entire cohort `(HR: 1.71; 95% CI: 1.40-2.09)`. Treatment centres located in Terengganu (HR: 0.52; 95% CI 0.31-0.88) and Pahang (HR: 0.42; 95% CI 0.20-0.87) had lower subdistribution hazard. 
 
 The side-by-side comparison of univariable CPH, multivariable CPH, and competing risk regression was illustrated in the table below: 
 
@@ -1158,21 +1859,22 @@ The side-by-side comparison of univariable CPH, multivariable CPH, and competing
 tab1
 ```
 
+The cause-specific hazard ratios were illustrated in Figure 1: 
 ```{r, fig1, eval=T, warning=F, results=T, message=F, echo=F, cache=F, out.width="99%"}
 comp %>% 
-  hr_plot(dependent_dss, explanatory, dependent_label = "Cause-specific Survival", table_text_size = 3.5, title_text_size = 15)
+  hr_plot(dependent_dss, explanatory, dependent_label = "Figure 1: CS Survival", table_text_size = 3.5, title_text_size = 15)
 
 ```
 
 ## Parsimonous model 
 
-Using the forward method and the Bayesian information criterion (BIC), the most parsimous competing risk model has *PD brand* as the sole covariate. 
+Using the backward method and the Bayesian information criterion (BIC), the most parsimous competing risk model has *PD brand* as the sole covariate. 
 
 # Discussion 
 
 In the presence of competing risk, we had two choices to fit the survival model. The cause-specific hazard model (multivariate CPH) suggested that older age, partial assistance to perform CAPD, and PD product from FMC could increase the rate of peritonitis in patients who were still event-free. This finding corresponds to our previous studies [@ongRiskPeritonealDialysisRelated2017]. 
 
-Although the variable *treatment centre* showed significance, our model selection process suggested that only the *PD brand* should be included in the final model (most parsimonous). The model suggested that a switch from Baxter to FMC PD product was associated with 69% increase in the subdistribution hazard of peritonitis. However, we cautioned that this association warrants further confirmation. 
+Although the variable *treatment centre (between states)* showed significance, our model selection process suggested that only the *PD brand* should be included in the final model (most parsimonous). The model suggested that a switch from Baxter to FMC PD product was associated with 69% increase in the subdistribution hazard of peritonitis. However, this association warrants further confirmation with detailed investigation into individual products and their association with peritonitis risk. 
 
 
 ```{r, include=FALSE}

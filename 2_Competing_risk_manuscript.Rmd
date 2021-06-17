@@ -31,6 +31,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Recode the variable 
 library(finalfit)
+library(survival)
+library(survminer)
 library(dplyr)
 library(forcats) #solve problems with factor variables 
 library(kableExtra)
@@ -396,7 +398,7 @@ ggcompetingrisks(
 
 # Results 
 ## Cohort description 
-There were 1,149 patients who met the study eligibility criteria and included in the analysis. The basic demographic information of the cohort was shown in Table \@ref(tab:tab1). 
+There were 1,149 patients who met the study eligibility criteria and included in the analysis. The basic demographic information of the cohort was shown in Table \@ref(tab:tab1). The mean age of the cohort was 58.5 years but covered a wide age range (standard deviation of 14.5 years). The gender and racial composition of the cohort closely resembled the national demographic distribution. At baseline, 63% of the patients used Baxter PD products, while 36.6% of them used Fresenius PD products. Only 0.4% of patients were using Lucenxia's PD product in 2014. The majority of the cohort (83.8%) was put on continuous ambulatory PD (CAPD). The remaining 5.0% was put on daytime ambulatory PD (DAPD) and 11.1% (**numbers dont add up**) were on either automated PD (APD), continuous cycling PD (CCPD) or nocturnal intermittent PD (NIPD). 
 
 ```{r tab1,eval=T, echo=F, cache=F, results=F, warning=F, message=F}
 tab1
@@ -420,8 +422,7 @@ library(magrittr)
 
 
 
-
-
+%
 
 
 

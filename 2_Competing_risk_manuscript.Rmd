@@ -89,7 +89,7 @@ comp = comp %>%
       fct_recode("No help" = "1", 
                  "Partial" = "2", 
                  "Dependent" = "3") %>%
-      ff_label("CAPD Assistance"), 
+      ff_label("PD Assistance"), 
     dm = factor(dm) %>%
       fct_recode("Yes" = "1", 
                  "No" = "0") %>%
@@ -137,7 +137,7 @@ comp = comp %>%
                  "Sabah" = "12", 
                  "Sarawak" = "13", 
                  "KL" = "14") %>%
-      ff_label("Treatment Centre"),
+      ff_label("Treatment Centre (States)"),
     PDSystem = factor(PDSystem) %>%
       fct_recode("Ultrabag"            = "101", 
                  "Icodextrin"          = "102", 
@@ -431,7 +431,7 @@ library(magrittr)
 
 ## Cause-specific hazard of peritonitis 
 
-Cause-specific regression was used to analyse the instanteneous rate of peritonitis in patients who were event-free (had not experience any peritonitis or competing events). The median follow-up duration was 
+Cause-specific regression was used to analyse the instanteneous rate of peritonitis in patients who were event-free (had not experience any peritonitis or competing events). The median follow-up duration was XXXX. During this period, 469 patients (40.8%) experience first peritonitis. Univariate analysis indicated that **race**, **age group**, **PD assistance**, **diabetes as the primary renal disease**, and **treatment centre (states)** were significant covariates but subsequent multivariate Cox proportional regression showed that only **age group (80-89 years)** (HR: 2.07; 95% CI: 1.07-4.00), **partial need for PD assistance** (HR: 1.12; 95% CI: 1.04-1.76), **diabetes as the primary renal disease** (HR: 1.29; 95% CI: 1.04-1.60), 
 
 
 

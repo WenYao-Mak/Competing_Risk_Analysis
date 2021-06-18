@@ -158,18 +158,22 @@ comp = comp %>%
   relocate(status_dss, .after=status_os) %>%
   relocate(status_crr, .after=status_dss)
 
-# KM ANALYSIS FOR THE WHOLE COHORT 
-# to plot survival stratified by  single grouping variable, substitute "survival_object~1" by "survival_object~factor" 
 
-survival_object = comp %$% #beware of the exposition paramter, and NOT %>%
+#############################################################################################
+############################# KM ANALYSIS FOR THE WHOLE COHORT ##############################
+#############################################################################################
+
+# to plot survival stratified by a single grouping variable, substitute "survival_object~1" by "survival_object~factor" 
+
+survival_object = comp %$%        #beware of the exposition parameter, and NOT %>%
   Surv(time = m.time, status_os)
-
-#overall survival in whole cohort 
+ 
+# Overall survival in whole cohort 
  my_survfit = survfit(survival_object ~ 1, data = comp)
  my_survfit  #1149 patients, 418 events 
 
-#Life table 
-# A tabular form of KM plot that shows survival as a proportion, together with confidence limits 
+# Life table 
+## A tabular form of KM plot that shows survival as a proportion, together with confidence limits 
 summary(my_survfit, times = c(0, 12, 24, 36, 48, 60))
 
 # Kaplan Meier Plot 
@@ -179,11 +183,14 @@ explanatory = 1
  comp %>%
    surv_plot(dependent_os, explanatory, pval=TRUE)
 
-# total number of censor 
+# Total number of censor 
  sum(comp$status==0) #574
  sum(comp$status==2)
  
- 
+#############################################################################################
+############################# CAUSE-SPECIFIC HAZARD REGRESSION ##############################
+#############################################################################################
+
 # COX PROPORTIONAL HAZARD REGRESSION 
 
 #Univariable and multivariable models 
@@ -412,7 +419,7 @@ tab1
 
 (contrast dash line and solid lines - KM vs CI competing risks)
 
-The median time to first peritonitis produced by the KM analysis was 37.1 months. By the end of the follow-up period (*t*=60 months), 53.6% of the patients had experience a peritonitis episode. 
+The median time to first peritonitis produced by the KM analysis was 37.1 months. When the cumulative incidence was calculated, the probability of experiencing first peritonitis within the first year was 22.7%. By the end of the follow-up period (*t*=60 months), 53.6% of the patients had experienced a peritonitis episode. 
 
 ```{r KM, eval=T, echo=F, cache=F, results=F, warning=F, message=F}
 library(survival)
@@ -422,13 +429,15 @@ library(magrittr)
 
 ```
 
+## Cause-specific hazard of peritonitis 
+
+Cause-specific regression was used to analyse the instanteneous rate of peritonitis in patients who were event-free (had not experience any peritonitis or competing events). The median follow-up duration was 
 
 
 
 
 
 
-%
 
 
 

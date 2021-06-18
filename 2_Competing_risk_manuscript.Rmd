@@ -272,7 +272,10 @@ explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")  #here Age 
   comp %>% 
     hr_plot(dependent_os, explanatory)
 
- 
+#############################################################################################
+################################ COMPETING RISK REGRESSION ##################################
+#############################################################################################
+
 #COMPETING RISK REGRESSION 
 
 #the Fine & Gray model is one option to deal with competing risk. The crr() syntax differs from survival::coxph() but finalfit brings these together 
@@ -431,7 +434,11 @@ library(magrittr)
 
 ## Cause-specific hazard of peritonitis 
 
-Cause-specific regression was used to analyse the instanteneous rate of peritonitis in patients who were event-free (had not experience any peritonitis or competing events). The median follow-up duration was XXXX. During this period, 469 patients (40.8%) experience first peritonitis. Univariate analysis indicated that **race**, **age group**, **PD assistance**, **diabetes as the primary renal disease**, and **treatment centre (states)** were significant covariates but subsequent multivariate Cox proportional regression showed that only **age group (80-89 years)** (HR: 2.07; 95% CI: 1.07-4.00), **partial need for PD assistance** (HR: 1.12; 95% CI: 1.04-1.76), **diabetes as the primary renal disease** (HR: 1.29; 95% CI: 1.04-1.60), 
+Cause-specific regression was used to analyse the instanteneous rate of peritonitis in patients who were event-free (had not experience any peritonitis or competing events). The median follow-up duration was XXXX. During this period, 469 patients (40.8%) experience first peritonitis. Univariate analysis indicated that **race**, **age group**, **PD assistance**, **diabetes as the primary renal disease**, **treatment centre (states)** and **PD company** were significant covariates but subsequent multivariate Cox proportional regression showed that only **age group (80-89 years)** (HR: 2.07; 95% CI: 1.07-4.00), **partial need for PD assistance** (HR: 1.12; 95% CI: 1.04-1.76), **diabetes as the primary renal disease** (HR: 1.29; 95% CI: 1.04-1.60), **treatment centre in Melaka** (HR: 0.51; 95% CI: 0.27-0.96), **treatment centre in Terengganu** (HR: 0.57; 95% CI 0.36-0.91), and **Fresenius** products (HR: 1.66; 95% CI: 1.37-2.00) had a significant influence on the instanteneous rate of peritonitis in patients who were still event-free (see Table 1 -- reference the table here)
+
+## Subdistribution hazard of peritonitis 
+
+Subdistribution hazard model gave the probabilities of peritonitis in patients who had not experienced any peritonitis or had had the competing risk events prior to a designated time *t*. Our model suggested a similar set of covariates had affected the peritonitis probability. **Age group (80-89 years)** (HR: 2.16; 95% CI: 1.10-4.27), **partial need for PD assistance** (HR: 1.35; 95% CI: 1.03-1.76), **diabetes as the primary renal disease** (HR: 1.26; 95% CI: 1.01-1.56), and **Fresenius** products (HR: 1.68; 95% CI: 1.39-2.04). 
 
 
 

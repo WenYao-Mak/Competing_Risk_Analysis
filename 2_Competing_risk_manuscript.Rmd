@@ -272,7 +272,7 @@ explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")  #here Age 
     hr_plot(dependent_os, explanatory)
 
 #############################################################################################
-################################ COMPETING RISK REGRESSION ##################################
+########################### SUBDISTRIBUTION HAZARD REGRESSION ###############################
 #############################################################################################
 
 #COMPETING RISK REGRESSION 
@@ -393,9 +393,15 @@ ggcompetingrisks(
 
 # Introduction 
 
-Prior studies have shown that PD patients who were hypoalbumineuea......etc (list out .......) were more prone to experience peritonitis. Yet, the time-to-peritonitis analyses were rarely undertaken with competing risks taken into consideration, when competing events had the potential to distort (??) the risk (or hazard) or peritonitis and introduce bias in the probability estimation of peritonitis. 
+Prior studies have shown that certain end-stage kidney failure (ESKF) patients who received peritoneal dialysis (PD) were at a higher risk of peritonitis [@ongRiskPeritonealDialysisRelated2017a]. On average, the rate of peritonitis among PD patients in Malaysia was 0.27 episode per patient-year in a 2009 national PD patient cohort. Studies that examined specific PD products produced different peritonitis rates. A recent multicentre randomised trial of Fresenius Medical Care PD products showed a higher peritonitis rate of 0.41 episode per patient-year [@makClinicalEffectivenessMalaysianmanufactured2021a]. Peritonitis rates produced in similar comparison studies were inconsistent, ranging from 0.34 to 1.26 episodes per patient-year [@wongRandomizedMulticenterOpenlabel2006a; @ongRandomizedMulticenterOpenlabel2003a]. 
 
-not transferable to other population/country since the baseline hazard may change - which paper? 
+In a clinical trial setting, it may not be possible to observe every event of peritonitis given the limited duration of follow-up. Some of the patients may not have developed any peritonitis prior to trial completion. Long-term observational studies with survival analysis may be more feasible to uncover the true peritonitis rates in a given population. Yet, time-to-event analyses were rarely undertaken with competing risks taken into consideration, when competing events had the potential to introduce bias in the calculation [@andersenCompetingRisksEpidemiology2012]. 
+
+We aimed to evaluate the hazards and cumulative incidence of first peritonitis among PD patients in Malaysia in the presence of competing events. 
+
+
+
+not transferable to other population/country since the distribution of the compting vents differ from the original population - Lau et al 
 
 
 
@@ -403,6 +409,7 @@ not transferable to other population/country since the baseline hazard may chang
 ## Study design 
 
 ## Data source 
+We considered data from the National Renal Registry comprising cohorts of patients who initiated PD in 2014, comparing outcomes in patients with different risk factors. Notably, we included five previously identified risk factors of peritonitis: **Age**
 
 ## Population 
 
@@ -421,6 +428,9 @@ There were 1,149 patients who met the study eligibility criteria and included in
 ```{r tab1,eval=T, echo=F, cache=F, results=F, warning=F, message=F}
 tab1
 ```
+
+## Goodness of fit (Proportionlity of hazard assumption)
+
 
 ## Crude risks 
 

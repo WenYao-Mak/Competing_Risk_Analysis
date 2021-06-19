@@ -28,7 +28,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r ff_final, eval=T, echo=F, cache=F, results=F, warning=F, message=F}
 
-
 # Recode the variable 
 library(finalfit)
 library(survival)
@@ -137,7 +136,7 @@ comp = comp %>%
                  "Sabah" = "12", 
                  "Sarawak" = "13", 
                  "KL" = "14") %>%
-      ff_label("Treatment Centre (States)"),
+      ff_label("States"),
     PDSystem = factor(PDSystem) %>%
       fct_recode("Ultrabag"            = "101", 
                  "Icodextrin"          = "102", 
@@ -394,6 +393,11 @@ ggcompetingrisks(
 
 # Introduction 
 
+Prior studies have shown that PD patients who were hypoalbumineuea......etc (list out .......) were more prone to experience peritonitis. Yet, the time-to-peritonitis analyses were rarely undertaken with competing risks taken into consideration, when competing events had the potential to distort (??) the risk (or hazard) or peritonitis and introduce bias in the probability estimation of peritonitis. 
+
+not transferable to other population/country since the baseline hazard may change - which paper? 
+
+
 
 # Methods 
 ## Study design 
@@ -438,7 +442,11 @@ Cause-specific regression was used to analyse the instanteneous rate of peritoni
 
 ## Subdistribution hazard of peritonitis 
 
-Subdistribution hazard model gave the probabilities of peritonitis in patients who had not experienced any peritonitis or had had the competing risk events prior to a designated time *t*. Our model suggested a similar set of covariates had affected the peritonitis probability. **Age group (80-89 years)** (HR: 2.16; 95% CI: 1.10-4.27), **partial need for PD assistance** (HR: 1.35; 95% CI: 1.03-1.76), **diabetes as the primary renal disease** (HR: 1.26; 95% CI: 1.01-1.56), and **Fresenius** products (HR: 1.68; 95% CI: 1.39-2.04). 
+Subdistribution hazard model gave the probabilities of peritonitis in patients who had not experienced any peritonitis or had had the competing risk events prior to a designated time *t*. Our model suggested a similar set of covariates had affected the peritonitis probability. **Age group (80-89 years)** (HR: 2.16; 95% CI: 1.10-4.27), **partial need for PD assistance** (HR: 1.35; 95% CI: 1.03-1.76), **diabetes as the primary renal disease** (HR: 1.26; 95% CI: 1.01-1.56), and **Fresenius** products (HR: 1.68; 95% CI: 1.39-2.04). Treatment centr was another ........
+
+
+
+
 
 
 

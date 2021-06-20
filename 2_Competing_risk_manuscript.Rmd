@@ -409,11 +409,13 @@ not transferable to other population/country since the distribution of the compt
 ## Study design 
 
 ## Data source 
-We considered data from the National Renal Registry comprising cohorts of patients who initiated PD in 2014, comparing outcomes in patients with different risk factors. Notably, we included five previously identified risk factors of peritonitis: **Age**
-
+We considered data from the National Renal Registry (NRR) comprising cohorts of patients who initiated PD in 2014, comparing outcomes in patients with different risk factors. The registry was established in 1992 and collects data from all patients receiving renal replacement therapy in public hospitals. 
 ## Population 
 
+
+
 ## Definition of outcomes 
+Our primary interest was on the effects of the **brands** of PD products and the **assistance required to perform PD**. We also included other variables in the multivariate analysis, such as **age**, **diabetes**, **hypertension**, **race**, **ESKF duration**, and **PD duration**. We stratified our analysis based on **treatment centre**. 
 
 ## Cox proportional hazard 
 

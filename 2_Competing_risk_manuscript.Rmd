@@ -61,12 +61,25 @@ comp = comp %>%
       status == 1 ~ 1, #peritonitis 
       TRUE ~ 0),    #Other causes are censored 
     
+    #disease specific survival on technique failure 
+    status_dss2 = case_when(
+      status == 0 ~ 0, #no event 
+      status == 2 ~ 1, #technique failure 
+      TRUE ~ 0),       #other causes are censored
+    
     #competing risk regression 
     status_crr = case_when(
       status == 0 ~ 0, #no event 
       status == 1 ~ 1, #peritonitis 
-      status == 2 ~ 2,
-      TRUE ~ 0), #competing risk 
+      status == 2 ~ 2, #competing risk 
+      TRUE ~ 0), 
+    
+    #competing risk regression on technique failure 
+    status_crr2 = case_when(
+      status == 0 ~ 0, #no event 
+      status == 2 ~ 1, #technique failure 
+      status == 1 ~ 2, #competing risk 
+      TRUE ~ 0),
     
     #Label and recode other variable 
     Age2 = factor(Age2) %>%
@@ -155,7 +168,9 @@ comp = comp %>%
 comp = comp %>%
   relocate(status_os, .after=status) %>%
   relocate(status_dss, .after=status_os) %>%
-  relocate(status_crr, .after=status_dss)
+  relocate(status_dss2, .after=status_dss) %>%
+  relocate(status_crr, .after=status_dss2) %>%
+  relocate(status_crr2, .after=status_crr)
 
 
 #############################################################################################
@@ -192,10 +207,13 @@ explanatory = 1
 
 # COX PROPORTIONAL HAZARD REGRESSION 
 
-#Univariable and multivariable models 
+# STEP 1: Univariable and multivariable models 
 dependent_os = "Surv(m.time, status_os)"
 dependent_dss = "Surv(m.time, status_dss)"
+dependent_dss2 = "Surv(m.time, status_dss2)"
 dependent_crr = "Surv(m.time, status_crr)"
+dependent_crr2 = "Surv(m.time, status_crr2)"
+
 explanatory = c("PtRace", "Age2", "PtAssist", "dm", "gl","neph","hpt","AD","her.neph", "site", "brand")
 
 comp %>% 
@@ -210,7 +228,7 @@ comp %>%
   rename("  " = all) %>%
   mykable()
 
-#Reduced model 
+# STEP 2: Reduced model 
 #if you are using a backwards selection approach or similar, a reduced model can be directly specified and compared. The full model can be kept or dropped 
 ## variables that are significant at p<0.1 in the Cox univriable
 
@@ -220,30 +238,63 @@ comp %>%
   finalfit(dependent_os, explanatory, explanatory_multi, keep_models = TRUE) %>%
   mykable()
 
-#Testing for porportional hazard
+###############
+###############
+## cox.zph() ##  Testing PH Assumption in CSH of covariates 
+###############
+###############
+
 #the cox.zph() function from the survival package allows us to test this assumption for each variable. The plot of scaled Schoenfeld residuals should be a horizontl line. The included hypothesis test identifies whether the gradient differs from zero for each variables. No variable significantly differs from zero at the 5% significance level 
 
-explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")  #here Age got issue, might need to    change to Age2 - later
+## Event of Interest: Peritonitis 
+
+explanatory = c("PtRace","Age2", "PtAssist", "dm", "brand", "strata(site)")  # categorical "Age2" was used 
+
  comp %>% 
-   coxphmulti(dependent_os, explanatory) %>%
+   coxphmulti(dependent_dss, explanatory) %>%
    cox.zph() %>%
    {zph_result <<- .} %>%
-   plot(var=5)
+   plot() %>% #change the var=*number* to change which covariate is plotted 
+              #leaving the `var=1` empty, i.e. plot(), will plot all covariates 
+   abline(h=0, lty=3) #only applies to the last plot (why?)
 
  zph_result
 
+ 
+ ## Event of Interst: Technique Failure 
+ 
+ explanatory = c("PtRace","Age2", "PtAssist", "dm", "brand", "strata(site)")  # categorical "Age2" was used 
 
-#Stratified models
+ comp %>% 
+   coxphmulti(dependent_dss2, explanatory) %>%
+   cox.zph() %>%
+   {zph_result <<- .} %>%
+   plot() %>% #change the var=*number* to change which covariate is plotted 
+              #leaving the `var=1` empty, i.e. plot(), will plot all covariates 
+   abline(h=0, lty=3) #only applies to the last plot (why?)
+
+ zph_result
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+# STEP 3: Stratified models based on "state"
 # including a strata() term will result in a separate baseline hazard function being fit for each level in the stratification variable. It will no longer be possible to make direct inference on the effect associated with that variable 
 
-#explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site", "strata(DataYear)") #DataYear might not be the the best #strata() term, but just to illustrate
+explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "strata(site)") #stratified according to state of the sites
 
-#comp %>% 
-#  finalfit(dependent_os, explanatory) %>%
-#  mykable()
+comp %>% 
+  finalfit(dependent_dss, explanatory) %>%
+  mykable()
 
 
-#Correlated Groups of Observations 
+# STEP 4: Correlated Groups of Observations 
 # to account for any higher structure in the data, e.g. patients are clustered within particular hospitals 
 # Two broad approach to dealing with correlated groups of observatio n
 
@@ -261,10 +312,19 @@ explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")  #here Age 
 
 
 #frailty model 
-#explanatory = c("PtRace", "Age2", "PtAssist", "brand", "dm", "frailty(site)")
-#comp %>% 
-#  finalfit(dependent_os, explanatory) %>%
-#  mykable()
+explanatory = c("PtRace", "Age", "PtAssist", "brand", "dm", "frailty(site)")
+
+comp %>% 
+  finalfit(dependent_dss, explanatory) %>%
+  mykable()
+
+
+# STEP 4: frailty model on technique failure 
+explanatory = c("PtRace", "Age", "PtAssist", "brand", "dm", "frailty(site)")
+
+comp %>% 
+  finalfit(dependent_dss2, explanatory) %>%
+  mykable()
 
 
 #Hazard ratio plot 
@@ -283,6 +343,7 @@ explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")  #here Age 
  
 explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")
 dependent_dss = "Surv(m.time, status_dss)"
+dependent_dss2 = "Surv(m.time, status_dss2)"
 dependent_crr = "Surv(m.time, status_crr)"
 
   comp %>% 
@@ -314,6 +375,18 @@ dependent_crr = "Surv(m.time, status_crr)"
     mykable()
 
 
+###############
+###############
+##   crr()   ##  Testing PH Assumption in SH of covariates 
+###############
+###############
+
+explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")
+dependent_dss = "Surv(m.time, status_dss)"
+dependent_dss2 = "Surv(m.time, status_dss2)"
+dependent_crr = "Surv(m.time, status_crr)"
+  
+  
 ### Only CPH and competing risk   
 explanatory = c("Age2","PtAssist", "brand", "site")
 dependent_dss = "Surv(m.time, status_dss)"
@@ -406,21 +479,26 @@ not transferable to other population/country since the distribution of the compt
 
 
 # Methods 
-## Study design 
-
 ## Data source 
-We considered data from the National Renal Registry (NRR) comprising cohorts of patients who initiated PD in 2014, comparing outcomes in patients with different risk factors. The registry was established in 1992 and collects data from all patients receiving renal replacement therapy in public hospitals. 
+We considered data from the National Renal Registry (NRR) comprising cohorts of patients who initiated PD in 2014, comparing outcomes in patients with different risk factors. The registry was established in 1992 and collects data from all patients receiving renal replacement therapy in public hospitals.  
+
 ## Population 
-
-
+Incident patients who initated PD in 2014 were included. The sample consisted of 1,149 patients treated in 29 public hospitals. Patients were followed up until the first of the following: peritonitis, transfer to haemodialysis, death, or administrative censoring (November 28, 2018). Our primary interest was on the effects of the **brands** of PD products and the **assistance required to perform PD**. We also included other variables in the multivariate analysis, such as **age**, **diabetes**, **hypertension**, **race**, **ESKF duration**, and **PD duration**. We stratified our analysis based on **treatment centre**. 
 
 ## Definition of outcomes 
-Our primary interest was on the effects of the **brands** of PD products and the **assistance required to perform PD**. We also included other variables in the multivariate analysis, such as **age**, **diabetes**, **hypertension**, **race**, **ESKF duration**, and **PD duration**. We stratified our analysis based on **treatment centre**. 
+Peritonitis was defined by the 2016 International Society for Peritoneal Dialysis guideline and recommendation [@liISPDPeritonitisRecommendations2016a]. We counted recurrent and repeat episodes as independent cases, but relapsing peritonitis was not counted separately. 
+
+The competing event was **technique failure** defined as a transfer to haemodialysis for more than 30 days. Technique failure was a frequent complication of PD that occluded the occurrence of peritonitis. We did not include other potential competing events such as kidney transplants or partial recovery of kidney functions because of their low rates of occurrence. 
 
 ## Cox proportional hazard 
 
 ## Competing risk analysis 
 
+## Goodness of fit tests 
+The proportionality hazard (PH) assumption of the CSH models was tested with the cox.zph function provided by the survival package. It tested the proportionality of all covariates in the model using scaled Schoenfeld residuals. 
+
+We attempted to check the PH assumption for the SH models by plotting the Schoenfeld-type residuals against time failure for each of the covariates. This was done through the crr function in the cmprsk package. 
+ 
 ## Softwares used 
 
 # Results 
@@ -432,6 +510,8 @@ tab1
 ```
 
 ## Goodness of fit (Proportionlity of hazard assumption)
+The proportionality assumption of the CSH of the covariates were checked by using scaled Schoenfeld residuals. The PH assumption of the CSH of **peritonitis** was met for **Race** (p=0.93), **Age** (p=0.42), **Assistance required to perform PD** (p=0.61), **diabetes** (p=0.84), and **brands** (p=0.46). Similarly, the PH assumption of the CSH of **technique failure** was met for **Race** (p=0.93), **Age** (p=0.37), **Assistance required to perform PD** (p=0.99), **diabetes** (p=0.42), and **brands** (p=1.00). 
+
 
 
 ## Crude risks 

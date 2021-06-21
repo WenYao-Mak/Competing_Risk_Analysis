@@ -341,10 +341,12 @@ comp %>%
 
 #it uses the finalfit::ff_merge() function, which can join any number of models together 
  
-explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")
 dependent_dss = "Surv(m.time, status_dss)"
 dependent_dss2 = "Surv(m.time, status_dss2)"
 dependent_crr = "Surv(m.time, status_crr)"
+dependent_crr2 = "Surv(m.time, status_crr2)"
+
+explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "frailty(site)")
 
   comp %>% 
     #summary table 
@@ -374,18 +376,6 @@ dependent_crr = "Surv(m.time, status_crr)"
   dependent_label(comp, "Survival") %>%
     mykable()
 
-
-###############
-###############
-##   crr()   ##  Testing PH Assumption in SH of covariates 
-###############
-###############
-
-explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "site")
-dependent_dss = "Surv(m.time, status_dss)"
-dependent_dss2 = "Surv(m.time, status_dss2)"
-dependent_crr = "Surv(m.time, status_crr)"
-  
   
 ### Only CPH and competing risk   
 explanatory = c("Age2","PtAssist", "brand", "site")
@@ -461,6 +451,113 @@ ggcompetingrisks(
 
 ```
 
+```{r PH_SH, eval=T, echo=F, cache=F, warning=F, message=F}
+
+###############
+###############
+##   crr()   ##  Testing PH Assumption in SH of covariates 
+###############
+###############
+
+# Schoenfeld-type residuals from the crr() function was used to plot the 
+library(cmprsk)
+
+################################## factor2ind helper function ######################################
+if(!require(cmprsk))
+  { stop("the package 'cmprsk' is required, please install it. \nSee help(install.packages).") }
+  
+factor2ind <- function(x, baseline)
+{
+# Given a factor variable x, create an indicator matrix of dimension 
+# length(x) x (nlevels(x)-1) dropping the column corresponding to the 
+# baseline level (by default the first level is used as baseline).
+# Example:
+# > x = gl(4, 2, labels = LETTERS[1:4])
+# > factor2ind(x)
+# > factor2ind(x, "C")
+  xname <- deparse(substitute(x))
+  n <- length(x)
+  x <- as.factor(x)
+  if(!missing(baseline)) x <- relevel(x, baseline)
+  X <- matrix(0, n, length(levels(x)))
+  X[(1:n) + n*(unclass(x)-1)] <- 1
+  X[is.na(x),] <- NA
+  dimnames(X) <- list(names(x), paste(xname, levels(x), sep = ":"))
+  return(X[,-1,drop=FALSE])
+}
+
+modsel.crr <- function (object, ..., d = log(object$n)) 
+{
+  if(class(object) != "crr") 
+    stop("object is not of class 'crr'")
+  objects <- list(object, ...)
+  nmodels <- length(objects)
+  modnames <- paste("Model ", format(1:nmodels), ": ", 
+                      lapply(objects, function(x) x$call), 
+                      sep = "", collapse = "\n")
+  # add null model
+  mod0 <- object
+  mod0$loglik <- mod0$loglik.null
+  mod0$coef <- mod0$call$cov1 <- mod0$call$cov2 <- NULL
+  objects <- c(list(mod0), objects)
+  nmodels <- nmodels + 1
+  #
+  modnames <- c("Model 0: Null model", modnames)
+  ns <- sapply(objects, function(x) x$n) 
+  dfs <- sapply(objects, function(x) length(x$coef)) 
+  if(any(ns != ns[1]))
+    stop("models were not all fitted to the same dataset")
+  out <- matrix(rep(NA, 5 * nmodels), ncol = 5)
+  loglik <- sapply(objects, function(x) x$loglik)
+  crit <- sapply(objects, function(x) -2*x$loglik + d*length(x$coef))
+  out[,1] <- ns
+  out[,2] <- loglik
+  out[,3] <- dfs
+  out[,4] <- crit
+  out[,5] <- crit - min(crit)
+  if(d==log(object$n)) critname <- "BIC"
+  else if(d == 2) critname <- "AIC"
+  else critname <- "Criterion"
+  colnames(out) <- c("Num.obs", "logLik", "Df.fit", critname, paste(critname, "diff"))
+  rownames(out) <- 0:(nmodels-1)
+  title <- "Model selection table\n"
+  topnote <- modnames
+  structure(as.data.frame(out), heading = c(title, topnote), 
+            class = c("anova", "data.frame"))
+}
+#####################################################################################################
+
+factor2ind(comp$PtRace, 1)      #Malay as baseline 
+factor2ind(comp$Age2, "18-29")  #youngest age group 
+factor2ind(comp$PtAssist, 1)    #Complete self-care 
+factor2ind(comp$brand, 1)       #Baxter 
+factor2ind(comp$dm, "0")          #No diabetes 
+
+x <- cbind(factor2ind(comp$PtRace, 1), factor2ind(comp$Age2, "18-29"), factor2ind(comp$PtAssist, 1), factor2ind(comp$brand, 1), factor2ind(comp$dm, "0")) 
+
+mod.ff  <- crr(ftime = comp$m.time, fstatus = comp$status, x, failcode = 1, cencode = 0) #status=1, peritonitis 
+mod.ff2 <- crr(ftime = comp$m.time, fstatus = comp$status, x, failcode = 2, cencode = 0) #status=2, technique failure 
+
+# Schoenfeld-type residual plots for SH of Peritonitis 
+mod.ff$res
+par(mfrow=c(1,3), mar=c(4.5,4,2,1))
+for(j in 1:ncol(mod.ff$res))
+  scatter.smooth(mod.ff$uft, mod.ff$res[,j],
+                 main = names(mod.ff$coef)[j],
+                 xlab = "Failure time",
+                 ylab = "Schoenfeld residuals")
+
+# Schoenfeld-type residual plots for SH of Technique failure 
+mod.ff2$res
+par(mfrow=c(1,3), mar=c(4.5,4,2,1))
+for(j in 1:ncol(mod.ff2$res))
+  scatter.smooth(mod.ff2$uft, mod.ff2$res[,j],
+                 main = names(mod.ff2$coef)[j],
+                 xlab = "Failure time",
+                 ylab = "Schoenfeld residuals")
+
+
+```
 
 # Abstract 
 
@@ -512,7 +609,7 @@ tab1
 ## Goodness of fit (Proportionlity of hazard assumption)
 The proportionality assumption of the CSH of the covariates were checked by using scaled Schoenfeld residuals. The PH assumption of the CSH of **peritonitis** was met for **Race** (p=0.93), **Age** (p=0.42), **Assistance required to perform PD** (p=0.61), **diabetes** (p=0.84), and **brands** (p=0.46). Similarly, the PH assumption of the CSH of **technique failure** was met for **Race** (p=0.93), **Age** (p=0.37), **Assistance required to perform PD** (p=0.99), **diabetes** (p=0.42), and **brands** (p=1.00). 
 
-
+The PH assumption for the SH models was checked using the Schoenfeld-type residuals tailored for subdistribution hazards. Schoenfeld residual plots indicated the PH assumption was upheld (see Supplement)
 
 ## Crude risks 
 

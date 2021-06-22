@@ -335,7 +335,7 @@ comp %>%
 ########################### SUBDISTRIBUTION HAZARD REGRESSION ###############################
 #############################################################################################
 
-#COMPETING RISK REGRESSION 
+#COMPETING RISK REGRESSION (SUBDISTRIBUTION HAZARD)
 
 #the Fine & Gray model is one option to deal with competing risk. The crr() syntax differs from survival::coxph() but finalfit brings these together 
 
@@ -346,32 +346,39 @@ dependent_dss2 = "Surv(m.time, status_dss2)"
 dependent_crr = "Surv(m.time, status_crr)"
 dependent_crr2 = "Surv(m.time, status_crr2)"
 
-explanatory = c("PtRace", "Age2", "PtAssist", "dm", "brand", "frailty(site)")
+explanatory = c("Age2", "PtAssist", "dm", "brand", "frailty(site)") #reduced model stratified on site 
 
   comp %>% 
     #summary table 
   summary_factorlist(dependent_dss, explanatory, column = TRUE, fit_id = TRUE) %>% 
   
-    #Cox PH univariable 
-      ff_merge(
-        comp %>% 
-          coxphuni(dependent_dss, explanatory) %>%
-          fit2df(estimate_suffix = " (DSS CPH univariable)")
-      ) %>%
-    #Cox PH multivariable 
+    #Cox PH multivariable for Peritonitis 
       ff_merge(
         comp %>% 
           coxphmulti(dependent_dss, explanatory) %>%
-          fit2df(estimate_suffix = " (DSS CPH multivariable)")
+          fit2df(estimate_suffix = " (DSS CPH Peritonitis)")
+      ) %>%
+    #Cox PH multivariable for Technique failure 
+      ff_merge(
+        comp %>% 
+          coxphmulti(dependent_dss2, explanatory) %>%
+          fit2df(estimate_suffix = " (DSS CPH Technique Failure)")
       ) %>%
   
-    #Fine & Gray Competing Risk model 
+    #Fine & Gray Competing Risk model for Peritonitis 
       ff_merge(
         comp %>% 
           crrmulti(dependent_crr, explanatory) %>% 
-          fit2df(estimate_suffix = " (competing risks multivariable")
+          fit2df(estimate_suffix = " (CRR SH Peritonitis)")
       ) %>% 
-  
+    
+    #Fine & Gray Competing Risk model for technique failure 
+      ff_merge(
+        comp %>% 
+          crrmulti(dependent_crr2, explanatory) %>%
+          fit2df(estimate_suffix = "(CRR SH Technique Failure")
+      ) %>%
+    
   select(-fit_id, -index) %>% 
   dependent_label(comp, "Survival") %>%
     mykable()
@@ -397,7 +404,7 @@ tab1 <- comp %>%
       ff_merge(
         comp %>% 
           crrmulti(dependent_crr, explanatory) %>% 
-          fit2df(estimate_suffix = " (competing risks multivariable")
+          fit2df(estimate_suffix = " (competing risks multivariable)")
       ) %>% 
   
   select(-fit_id, -index) %>% 
@@ -609,7 +616,7 @@ tab1
 ## Goodness of fit (Proportionlity of hazard assumption)
 The proportionality assumption of the CSH of the covariates were checked by using scaled Schoenfeld residuals. The PH assumption of the CSH of **peritonitis** was met for **Race** (p=0.93), **Age** (p=0.42), **Assistance required to perform PD** (p=0.61), **diabetes** (p=0.84), and **brands** (p=0.46). Similarly, the PH assumption of the CSH of **technique failure** was met for **Race** (p=0.93), **Age** (p=0.37), **Assistance required to perform PD** (p=0.99), **diabetes** (p=0.42), and **brands** (p=1.00). 
 
-The PH assumption for the SH models was checked using the Schoenfeld-type residuals tailored for subdistribution hazards. Schoenfeld residual plots indicated the PH assumption was upheld (see Supplement)
+The PH assumption for the SH models was checked using the Schoenfeld-type residuals tailored for subdistribution hazards. Schoenfeld residual plots indicated the PH assumption was upheld (see Supplement) (** need to remove Lucenxia as the PH assumption was broken **)
 
 ## Crude risks 
 
@@ -625,7 +632,22 @@ library(magrittr)
 
 ```
 
-## Cause-specific hazard of peritonitis 
+## Effects of assistance to perform PD 
+
+The patient's need for assistance to perform PD 
+
+
+
+
+## Effects of PD brands 
+Products from Fresenius were significantly associated with an increase in the rate of peritonitis (CSHR 1.68, 95% confidence interval [1.39-2.02]) while it significantly decrease the rate of technique failure (CSHR 0.56, 95% confidence interval [0.35-0.90]). The results were consistent with the cumulative incidence analysis. PD products from Fresenius increased the probability of peritonitis (SH 1.73, 95% confidence interval [1.43-2.08]) while reducing the probability of technique failure (SH 0.47, 95% confidence interval [0.30-0.76]) (see Table XX).
+
+The CSHRs for peritonitis and technique failure showed opposite directions, and the SH for peritonitis was larger than that of CSHR. These results implied that we would observe more peritonitis cases in patients who used Fresenius PD products over a longer observation period. As both the cause-specific and subdistribution analyses were consistent with each other, the effect of using Fresenius PD products on the cumulative incidence of peritonitis was an actual effect and not due to indirect effect on the competing event (technique failure). We are aware that such effect may not necessarily be causal. 
+
+
+## Effects of diabetes 
+
+
 
 Cause-specific regression was used to analyse the instanteneous rate of peritonitis in patients who were event-free (had not experience any peritonitis or competing events). The median follow-up duration was XXXX. During this period, 469 patients (40.8%) experience first peritonitis. Univariate analysis indicated that **race**, **age group**, **PD assistance**, **diabetes as the primary renal disease**, **treatment centre (states)** and **PD company** were significant covariates but subsequent multivariate Cox proportional regression showed that only **age group (80-89 years)** (HR: 2.07; 95% CI: 1.07-4.00), **partial need for PD assistance** (HR: 1.12; 95% CI: 1.04-1.76), **diabetes as the primary renal disease** (HR: 1.29; 95% CI: 1.04-1.60), **treatment centre in Melaka** (HR: 0.51; 95% CI: 0.27-0.96), **treatment centre in Terengganu** (HR: 0.57; 95% CI 0.36-0.91), and **Fresenius** products (HR: 1.66; 95% CI: 1.37-2.00) had a significant influence on the instanteneous rate of peritonitis in patients who were still event-free (see Table 1 -- reference the table here)
 

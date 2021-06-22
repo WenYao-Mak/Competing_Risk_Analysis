@@ -384,6 +384,57 @@ explanatory = c("Age2", "PtAssist", "dm", "brand", "frailty(site)") #reduced mod
     mykable()
 
   
+  
+  
+##################
+### univariate ###    Univariate analysis of CSHR and SH 
+##################
+  
+dependent_dss = "Surv(m.time, status_dss)"
+dependent_dss2 = "Surv(m.time, status_dss2)"
+dependent_crr = "Surv(m.time, status_crr)"
+dependent_crr2 = "Surv(m.time, status_crr2)"
+
+explanatory = c("dm", "frailty(site)") #Only one covariate at a time 
+
+  comp %>% 
+    #summary table 
+  summary_factorlist(dependent_dss, explanatory, column = TRUE, fit_id = TRUE) %>% 
+  
+    #Cox PH multivariable for Peritonitis 
+      ff_merge(
+        comp %>% 
+          coxphmulti(dependent_dss, explanatory) %>%
+          fit2df(estimate_suffix = " (DSS CPH Peritonitis)")
+      ) %>%
+    #Cox PH multivariable for Technique failure 
+      ff_merge(
+        comp %>% 
+          coxphmulti(dependent_dss2, explanatory) %>%
+          fit2df(estimate_suffix = " (DSS CPH Technique Failure)")
+      ) %>%
+  
+    #Fine & Gray Competing Risk model for Peritonitis 
+      ff_merge(
+        comp %>% 
+          crrmulti(dependent_crr, explanatory) %>% 
+          fit2df(estimate_suffix = " (CRR SH Peritonitis)")
+      ) %>% 
+    
+    #Fine & Gray Competing Risk model for technique failure 
+      ff_merge(
+        comp %>% 
+          crrmulti(dependent_crr2, explanatory) %>%
+          fit2df(estimate_suffix = "(CRR SH Technique Failure")
+      ) %>%
+    
+  select(-fit_id, -index) %>% 
+  dependent_label(comp, "Survival") %>%
+    mykable()
+
+  
+  
+  
 ### Only CPH and competing risk   
 explanatory = c("Age2","PtAssist", "brand", "site")
 dependent_dss = "Surv(m.time, status_dss)"
@@ -632,28 +683,25 @@ library(magrittr)
 
 ```
 
-## Effects of assistance to perform PD 
-
-The patient's need for assistance to perform PD 
-
-
-
-
 ## Effects of PD brands 
 Products from Fresenius were significantly associated with an increase in the rate of peritonitis (CSHR 1.68, 95% confidence interval [1.39-2.02]) while it significantly decrease the rate of technique failure (CSHR 0.56, 95% confidence interval [0.35-0.90]). The results were consistent with the cumulative incidence analysis. PD products from Fresenius increased the probability of peritonitis (SH 1.73, 95% confidence interval [1.43-2.08]) while reducing the probability of technique failure (SH 0.47, 95% confidence interval [0.30-0.76]) (see Table XX).
 
 The CSHRs for peritonitis and technique failure showed opposite directions, and the SH for peritonitis was larger than that of CSHR. These results implied that we would observe more peritonitis cases in patients who used Fresenius PD products over a longer observation period. As both the cause-specific and subdistribution analyses were consistent with each other, the effect of using Fresenius PD products on the cumulative incidence of peritonitis was an actual effect and not due to indirect effect on the competing event (technique failure). We are aware that such effect may not necessarily be causal. 
 
+**make a table that looks like Table 2 in Lau et al 2009 - show the changes in csRH1, csRH2, sdRH1 and the relevant interpretation** 
 
 ## Effects of diabetes 
+Patients who diabetes had a significant increase in the rate of peritonitis (CSHR 1.29, 95% confidence interval [1.05-1.60]) but not statistically signiciant (albeit slightly elevated) rate of technique failure (CSHR 1.29, 95% confidence interval [0.82-2.03]). Diabetes status also had a marginal effect (but not statistically significant) on the cumulative incidence of peritontis (SH 1.23, 95% confidence interval [1.00-1.51]) and no effect on the cumulative incidence of technique failure (SH 1.27, 95% confidence interval [0.83-1.95]). 
+
+Since both CSHRs pointed to the same direction (CSHR_1&2 >1), it was challenging to interpret the cumulative incidence function. As sdRH2 suggested no association (only nominally increased in CSHR with no statistical significance), the effect elicited by diabetes on peritonitis was not a true effect. 
 
 
+## Effects of assistance required to perform PD 
 
-Cause-specific regression was used to analyse the instanteneous rate of peritonitis in patients who were event-free (had not experience any peritonitis or competing events). The median follow-up duration was XXXX. During this period, 469 patients (40.8%) experience first peritonitis. Univariate analysis indicated that **race**, **age group**, **PD assistance**, **diabetes as the primary renal disease**, **treatment centre (states)** and **PD company** were significant covariates but subsequent multivariate Cox proportional regression showed that only **age group (80-89 years)** (HR: 2.07; 95% CI: 1.07-4.00), **partial need for PD assistance** (HR: 1.12; 95% CI: 1.04-1.76), **diabetes as the primary renal disease** (HR: 1.29; 95% CI: 1.04-1.60), **treatment centre in Melaka** (HR: 0.51; 95% CI: 0.27-0.96), **treatment centre in Terengganu** (HR: 0.57; 95% CI 0.36-0.91), and **Fresenius** products (HR: 1.66; 95% CI: 1.37-2.00) had a significant influence on the instanteneous rate of peritonitis in patients who were still event-free (see Table 1 -- reference the table here)
+Compared to patients who were fully independent in performing PD, patients who required partial assistance had a significant increase in peritonitis rate (CSHR 1.32, 95% confidence interval [1.01-1.71]) but a norminal decrease in the rate of technique failure (CSHR 0.67, 95% confidence interval [0.35-1.31]). We also observed a nominally increase in the cumulative incidence of peritonitis (SHR 1.24, 95% confidence interval [0.96 - 1.61]), and a nominal decrease in the cumulative incidence of technique failure (SHR 0.60, 95% confidence interval [0.32-1.13])
 
-## Subdistribution hazard of peritonitis 
+Both the CSRH and SHR showed opposite direction for both peritonitis and technique failure. However, due to the absence of statistical significance in SHR1 and SHR2, the effect of partial assistance shown in csHR1 may not be true and could be confounded by other risk factors. 
 
-Subdistribution hazard model gave the probabilities of peritonitis in patients who had not experienced any peritonitis or had had the competing risk events prior to a designated time *t*. Our model suggested a similar set of covariates had affected the peritonitis probability. **Age group (80-89 years)** (HR: 2.16; 95% CI: 1.10-4.27), **partial need for PD assistance** (HR: 1.35; 95% CI: 1.03-1.76), **diabetes as the primary renal disease** (HR: 1.26; 95% CI: 1.01-1.56), and **Fresenius** products (HR: 1.68; 95% CI: 1.39-2.04). Treatment centr was another ........
 
 
 

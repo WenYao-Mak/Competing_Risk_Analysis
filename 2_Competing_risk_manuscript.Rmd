@@ -386,16 +386,16 @@ explanatory = c("Age2", "PtAssist", "dm", "brand", "frailty(site)") #reduced mod
   
   
   
-##################
-### univariate ###    Univariate analysis of CSHR and SH 
-##################
+###################
+### interaction ###    Add interaction term between age group and PD assistance 
+###################
   
 dependent_dss = "Surv(m.time, status_dss)"
 dependent_dss2 = "Surv(m.time, status_dss2)"
 dependent_crr = "Surv(m.time, status_crr)"
 dependent_crr2 = "Surv(m.time, status_crr2)"
 
-explanatory = c("dm", "frailty(site)") #Only one covariate at a time 
+explanatory = c("Age2", "PtAssist", "dm", "brand", "frailty(site)") #Only one covariate at a time 
 
   comp %>% 
     #summary table 
@@ -667,7 +667,9 @@ tab1
 ## Goodness of fit (Proportionlity of hazard assumption)
 The proportionality assumption of the CSH of the covariates were checked by using scaled Schoenfeld residuals. The PH assumption of the CSH of **peritonitis** was met for **Race** (p=0.93), **Age** (p=0.42), **Assistance required to perform PD** (p=0.61), **diabetes** (p=0.84), and **brands** (p=0.46). Similarly, the PH assumption of the CSH of **technique failure** was met for **Race** (p=0.93), **Age** (p=0.37), **Assistance required to perform PD** (p=0.99), **diabetes** (p=0.42), and **brands** (p=1.00). 
 
-The PH assumption for the SH models was checked using the Schoenfeld-type residuals tailored for subdistribution hazards. Schoenfeld residual plots indicated the PH assumption was upheld (see Supplement) (** need to remove Lucenxia as the PH assumption was broken **)
+The PH assumption for the SH models was checked using the Schoenfeld-type residuals tailored for subdistribution hazards. Schoenfeld residual plots indicated the PH assumption was fulfilled for --------- but not for -------(see Supplement) (** need to remove Lucenxia as the PH assumption was broken **). 
+
+**Dignam et al 2012 - the proportionality assumption cannot be simultaneously satisfied for both CHRs and SHRs, but often either model will still provide a reasonably informatinve summary of covariate effects.** 
 
 ## Crude risks 
 
@@ -703,11 +705,17 @@ Compared to patients who were fully independent in performing PD, patients who r
 Both the CSRH and SHR showed opposite direction for both peritonitis and technique failure. However, due to the absence of statistical significance in SHR1 and SHR2, the effect of partial assistance shown in csHR1 may not be true and could be confounded by other risk factors. 
 
 
+## Effects of age 
+In comparison to the youngest age group, only patients aged between 70-79 years old had a significant increase in the rate of peritonitis (CSHR 1.80, 95% confidence interval [1.05-3.06]). CSHR for technique failure did not demonstrate any statistical significance albeit being nominally lower (CSHR 0.54, 95% confidence interval [0.21-1.35]). The cumulative incidence of peritonitis was significantly increased (SHR 1.85, 95% confidence interval [1.07-3.20]) but nominally lower for technique failure (SHR 0.46, 95% confidence interval [0.19-1.13]). All other age groups showed no significant difference in both the CSHR and SHR for peritonitis or technique failure. 
 
 
+## other variables 
+list out what variables have shown no effect on both CSHR and SHR 
 
 
+# Discussion 
 
+In this study, we examined two methods to evaluate the influence of four risk factors on peritonitis risks in the presence of a competing event. We showed that the brands of the PD product exerted a true effect on the outcome of interest where patients who used Fresenius PD products had a higher probability of peritonitis. This corresponds to our previous study on a separate patient cohort [@ongRiskPeritonealDialysisRelated2017a]. There were few studies that investigated the relationship between switching PD brands and the timing to first peritonitis and peritonitis rate. Nevertheless, such an association should not be mistaken as a causal effect between Fresenius products and peritonitis. Our work represents an early investigation into the potential effects of risk factors on peritonitis with little attention given to the estimation of causal effects in the presence of competing risks. 
 
 
 
